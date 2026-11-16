@@ -1,0 +1,37 @@
+"""The harness builds a Deep Agent without calling a model provider."""
+
+from langchain_core.language_models.fake_chat_models import GenericFakeChatModel
+from langchain_core.messages import AIMessage
+
+from patchai.config.models import Settings
+from patchai.harness import build_agent
+
+
+def test_build_agent_binds_plugin_tools_and_replies() -> None:
+    settings = Settings(
+        channel="cli",
+        model="ollama:llama3.1",
+        plugins=("example_clock",),
+        mcp_config="mcp.json",
+    )
+    bound_tool_names: list[str] = []
+
+    class _RecordingModel(GenericFakeChatModel):
+        """Fake model that records the tools the harness binds."""
+
+        def bind_tools(self, tools, *, tool_choice=None, **kwargs):  # noqa: ANN001, ANN003
+            bound_tool_names.extend(getattr(tool, "name", "") for tool in tools)
+            return self
+
+    agent = build_agent(
+        settings,
+        model=_RecordingModel(messages=iter([AIMessage(content="hello from patchai")])),
+    )
+
+    result = agent.invoke(
+        {"messages": [{"role": "user", "content": "hello"}]},
+        config={"configurable": {"thread_id": "test-thread"}},
+    )
+
+    assert "current_time" in bound_tool_names
+    assert result["messages"][-1].content == "hello from patchai"
