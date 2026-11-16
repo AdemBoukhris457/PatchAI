@@ -14,6 +14,9 @@ dependencies = [
     "deepagents>=0.5.2,<0.6",
 ]
 
+[project.scripts]
+patchai = "patchai.app:run"
+
 [project.optional-dependencies]
 dev = ["pytest>=8"]
 
