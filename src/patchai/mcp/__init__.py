@@ -1,4 +1,5 @@
-"""MCP server configuration.
+"""MCP server configuration."""
 
-The loader reads ``mcp.json`` and returns the server map the agent attaches.
-"""
+from patchai.mcp.loader import load_mcp_servers
+
+__all__ = ["load_mcp_servers"]

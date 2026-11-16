@@ -1,0 +1,11 @@
+[channel]
+active = "cli"
+
+[model]
+name = "ollama:llama3.1"
+
+[plugins]
+enabled = ["example_clock"]
+
+[mcp]
+config = "mcp.json"
