@@ -8,7 +8,11 @@ from datetime import datetime, timezone
 
 
 def current_time() -> str:
-    """Return the current UTC time in ISO 8601 format."""
+    """Return the current UTC time in ISO 8601 format.
+
+    Use this when the user asks what time it is, today's date, or the time
+    right now.
+    """
     return datetime.now(timezone.utc).isoformat()
 
 
