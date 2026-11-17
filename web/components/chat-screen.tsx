@@ -3,28 +3,18 @@
 import { useChat } from "@ai-sdk/react"
 import { TextStreamChatTransport, type UIMessage } from "ai"
 import { ArrowUpIcon } from "lucide-react"
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react"
 import { useTheme } from "next-themes"
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react"
 
 import { Button } from "@/components/ui/button"
 import { Bubble, BubbleContent } from "@/components/ui/bubble"
-import {
-  Empty,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyTitle,
-} from "@/components/ui/empty"
 import {
   InputGroup,
   InputGroupAddon,
   InputGroupButton,
   InputGroupTextarea,
 } from "@/components/ui/input-group"
-import {
-  Message,
-  MessageContent,
-  MessageHeader,
-} from "@/components/ui/message"
+import { Message, MessageContent } from "@/components/ui/message"
 import {
   MessageScroller,
   MessageScrollerButton,
@@ -51,7 +41,7 @@ function ThemeButton() {
 
   if (!mounted) {
     return (
-      <Button type="button" variant="outline" disabled>
+      <Button type="button" variant="ghost" size="sm" disabled>
         Theme
       </Button>
     )
@@ -62,7 +52,8 @@ function ThemeButton() {
   return (
     <Button
       type="button"
-      variant="outline"
+      variant="ghost"
+      size="sm"
       aria-label={dark ? "Use light theme" : "Use dark theme"}
       onClick={() => setTheme(dark ? "light" : "dark")}
     >
@@ -85,6 +76,7 @@ export function ChatScreen() {
   const wasBusy = useRef(false)
   const busy = status === "submitted" || status === "streaming"
   const canSend = draft.trim().length > 0 && !busy
+  const started = messages.length > 0
 
   useEffect(() => {
     if (busy) {
@@ -114,133 +106,123 @@ export function ChatScreen() {
     await submitText(raw)
   }
 
+  const composer = (
+    <form className="flex w-full flex-col gap-2" onSubmit={onSubmit}>
+      <p role="status" className="sr-only">
+        {busy ? "PatchAI is replying." : announcement}
+      </p>
+      {busy ? (
+        <p className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Spinner role="presentation" aria-hidden="true" />
+          PatchAI is replying.
+        </p>
+      ) : null}
+      {error ? (
+        <p role="alert" className="text-sm text-destructive">
+          {error.message}
+        </p>
+      ) : null}
+      <InputGroup className="rounded-[28px] bg-background px-1.5 py-1">
+        <label htmlFor="message" className="sr-only">
+          Message
+        </label>
+        <InputGroupTextarea
+          id="message"
+          name="message"
+          rows={2}
+          value={draft}
+          placeholder="Ask anything"
+          onChange={(event) => setDraft(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" && !event.shiftKey) {
+              event.preventDefault()
+              void submitText(event.currentTarget.value)
+            }
+          }}
+        />
+        <InputGroupAddon align="block-end" className="justify-end">
+          {busy ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => stop()}
+            >
+              Stop
+            </Button>
+          ) : null}
+          <InputGroupButton
+            type="submit"
+            size="icon-sm"
+            variant="default"
+            disabled={!canSend}
+            aria-label="Send"
+            className="rounded-full"
+          >
+            <ArrowUpIcon />
+          </InputGroupButton>
+        </InputGroupAddon>
+      </InputGroup>
+    </form>
+  )
+
   return (
-    <main className="flex h-svh border-l-[3px] border-seam">
-      <div className="mx-auto flex h-full w-full max-w-2xl flex-col px-5">
-        <header className="flex items-start justify-between gap-4 py-6">
-          <div className="flex flex-col gap-1">
-            <h1 className="font-reading text-2xl">PatchAI</h1>
-            <p className="text-sm text-muted-foreground">
-              A local conversation.
-            </p>
-          </div>
+    <main className="flex h-svh bg-background">
+      <div className="mx-auto flex h-full w-full max-w-3xl flex-col px-4">
+        <header className="flex h-14 shrink-0 items-center justify-between">
+          <h1 className="text-sm font-medium">PatchAI</h1>
           <ThemeButton />
         </header>
-        <MessageScrollerProvider autoScroll>
-          <MessageScroller className="min-h-0 flex-1">
-            <MessageScrollerViewport aria-label="Conversation">
-              <MessageScrollerContent
-                aria-busy={busy}
-                className="px-1 py-4"
-              >
-                {messages.length === 0 ? (
-                  <Empty className="border-0">
-                    <EmptyHeader>
-                      <EmptyTitle className="font-reading text-base">
-                        Start a conversation.
-                      </EmptyTitle>
-                      <EmptyDescription>
-                        Ask for the time, or tell PatchAI something to
-                        remember.
-                      </EmptyDescription>
-                    </EmptyHeader>
-                  </Empty>
-                ) : (
-                  messages.map((message) => {
-                    const own = message.role === "user"
-                    return (
-                      <MessageScrollerItem
-                        key={message.id}
-                        messageId={message.id}
-                        scrollAnchor={own}
-                      >
-                        <Message align={own ? "end" : "start"}>
-                          <MessageContent>
-                            <MessageHeader>
-                              {own ? "You" : "PatchAI"}
-                            </MessageHeader>
-                            <Bubble
-                              variant={own ? "default" : "ghost"}
-                              align={own ? "end" : "start"}
-                            >
-                              <BubbleContent
-                                className={
-                                  own
-                                    ? "whitespace-pre-wrap"
-                                    : "font-reading whitespace-pre-wrap text-base"
-                                }
+        <div
+          className={
+            started
+              ? "flex min-h-0 flex-1 flex-col pb-4"
+              : "flex flex-1 flex-col items-center justify-center gap-6 pb-16"
+          }
+        >
+          {started ? (
+            <MessageScrollerProvider autoScroll>
+              <MessageScroller className="min-h-0 flex-1">
+                <MessageScrollerViewport aria-label="Conversation">
+                  <MessageScrollerContent
+                    aria-busy={busy}
+                    className="gap-8 py-6"
+                  >
+                    {messages.map((message) => {
+                      const own = message.role === "user"
+                      return (
+                        <MessageScrollerItem
+                          key={message.id}
+                          messageId={message.id}
+                          scrollAnchor={own}
+                        >
+                          <Message align={own ? "end" : "start"}>
+                            <MessageContent>
+                              <Bubble
+                                variant={own ? "muted" : "ghost"}
+                                align={own ? "end" : "start"}
                               >
-                                {messageText(message)}
-                              </BubbleContent>
-                            </Bubble>
-                          </MessageContent>
-                        </Message>
-                      </MessageScrollerItem>
-                    )
-                  })
-                )}
-              </MessageScrollerContent>
-            </MessageScrollerViewport>
-            <MessageScrollerButton />
-          </MessageScroller>
-        </MessageScrollerProvider>
-        <form className="flex flex-col gap-2 pb-5" onSubmit={onSubmit}>
-          <p
-            role="status"
-            className="flex min-h-5 items-center gap-2 text-sm text-muted-foreground"
-          >
-            {busy ? (
-              <Spinner role="presentation" aria-hidden="true" />
-            ) : null}
-            {busy ? "PatchAI is replying." : null}
-            <span className="sr-only">{announcement}</span>
-          </p>
-          {error ? (
-            <p role="alert" className="text-sm text-destructive">
-              {error.message}
+                                <BubbleContent className="whitespace-pre-wrap text-base leading-7">
+                                  {messageText(message)}
+                                </BubbleContent>
+                              </Bubble>
+                            </MessageContent>
+                          </Message>
+                        </MessageScrollerItem>
+                      )
+                    })}
+                  </MessageScrollerContent>
+                </MessageScrollerViewport>
+                <MessageScrollerButton />
+              </MessageScroller>
+            </MessageScrollerProvider>
+          ) : (
+            <p className="text-center text-2xl tracking-tight">
+              How can I help you today?
             </p>
-          ) : null}
-          <InputGroup>
-            <label htmlFor="message" className="sr-only">
-              Message
-            </label>
-            <InputGroupTextarea
-              id="message"
-              name="message"
-              rows={3}
-              value={draft}
-              placeholder="Write a message"
-              onChange={(event) => setDraft(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" && !event.shiftKey) {
-                  event.preventDefault()
-                  void submitText(event.currentTarget.value)
-                }
-              }}
-            />
-            <InputGroupAddon align="block-end" className="justify-end">
-              {busy ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => stop()}
-                >
-                  Stop
-                </Button>
-              ) : null}
-              <InputGroupButton
-                type="submit"
-                size="icon-sm"
-                variant="default"
-                disabled={!canSend}
-                aria-label="Send"
-              >
-                <ArrowUpIcon />
-              </InputGroupButton>
-            </InputGroupAddon>
-          </InputGroup>
-        </form>
+          )}
+          {composer}
+        </div>
       </div>
     </main>
   )
