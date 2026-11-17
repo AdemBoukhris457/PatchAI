@@ -4,8 +4,16 @@ import { useChat } from "@ai-sdk/react"
 import { TextStreamChatTransport, type UIMessage } from "ai"
 import { ArrowUpIcon } from "lucide-react"
 import { useTheme } from "next-themes"
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react"
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+} from "react"
 
+import { ChatSidebar } from "@/components/chat-sidebar"
 import { Button } from "@/components/ui/button"
 import { Bubble, BubbleContent } from "@/components/ui/bubble"
 import {
@@ -23,13 +31,20 @@ import {
   MessageScrollerProvider,
   MessageScrollerViewport,
 } from "@/components/ui/message-scroller"
+import {
+  SidebarInset,
+  SidebarProvider,
+  SidebarTrigger,
+} from "@/components/ui/sidebar"
 import { Spinner } from "@/components/ui/spinner"
-
-function messageText(message: UIMessage) {
-  return message.parts
-    .map((part) => (part.type === "text" ? part.text : ""))
-    .join("")
-}
+import {
+  createChat,
+  loadChats,
+  messageText,
+  saveChats,
+  titleFrom,
+  type StoredChat,
+} from "@/lib/chats"
 
 function ThemeButton() {
   const { resolvedTheme, setTheme } = useTheme()
@@ -62,13 +77,22 @@ function ThemeButton() {
   )
 }
 
-export function ChatScreen() {
+function ChatThread({
+  chatId,
+  initialMessages,
+  onMessages,
+}: {
+  chatId: string
+  initialMessages: UIMessage[]
+  onMessages: (id: string, messages: UIMessage[]) => void
+}) {
   const transport = useMemo(
     () => new TextStreamChatTransport({ api: "/api/chat" }),
     [],
   )
   const { messages, sendMessage, status, error, stop } = useChat({
-    id: "web",
+    id: chatId,
+    messages: initialMessages,
     transport,
   })
   const [draft, setDraft] = useState("")
@@ -77,6 +101,10 @@ export function ChatScreen() {
   const busy = status === "submitted" || status === "streaming"
   const canSend = draft.trim().length > 0 && !busy
   const started = messages.length > 0
+
+  useEffect(() => {
+    onMessages(chatId, messages)
+  }, [chatId, messages, onMessages])
 
   useEffect(() => {
     if (busy) {
@@ -167,63 +195,161 @@ export function ChatScreen() {
   )
 
   return (
-    <main className="flex h-svh bg-background">
-      <div className="mx-auto flex h-full w-full max-w-3xl flex-col px-4">
-        <header className="flex h-14 shrink-0 items-center justify-between">
+    <div
+      className={
+        started
+          ? "mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col px-4 pb-4"
+          : "mx-auto flex w-full max-w-3xl flex-1 flex-col items-center justify-center gap-6 px-4 pb-16"
+      }
+    >
+      {started ? (
+        <MessageScrollerProvider autoScroll>
+          <MessageScroller className="min-h-0 flex-1">
+            <MessageScrollerViewport aria-label="Conversation">
+              <MessageScrollerContent aria-busy={busy} className="gap-8 py-6">
+                {messages.map((message) => {
+                  const own = message.role === "user"
+                  return (
+                    <MessageScrollerItem
+                      key={message.id}
+                      messageId={message.id}
+                      scrollAnchor={own}
+                    >
+                      <Message align={own ? "end" : "start"}>
+                        <MessageContent>
+                          <Bubble
+                            variant={own ? "muted" : "ghost"}
+                            align={own ? "end" : "start"}
+                          >
+                            <BubbleContent className="whitespace-pre-wrap text-base leading-7">
+                              {messageText(message)}
+                            </BubbleContent>
+                          </Bubble>
+                        </MessageContent>
+                      </Message>
+                    </MessageScrollerItem>
+                  )
+                })}
+              </MessageScrollerContent>
+            </MessageScrollerViewport>
+            <MessageScrollerButton />
+          </MessageScroller>
+        </MessageScrollerProvider>
+      ) : (
+        <p className="text-center text-2xl tracking-tight">
+          How can I help you today?
+        </p>
+      )}
+      {composer}
+    </div>
+  )
+}
+
+export function ChatScreen() {
+  const [chats, setChats] = useState<StoredChat[]>([])
+  const [activeId, setActiveId] = useState<string | null>(null)
+  const [query, setQuery] = useState("")
+  const [ready, setReady] = useState(false)
+
+  useEffect(() => {
+    const loaded = loadChats()
+    setChats(loaded)
+    setActiveId(loaded[0]?.id ?? null)
+    setReady(true)
+  }, [])
+
+  const remember = useCallback((id: string, messages: UIMessage[]) => {
+    setChats((current) => {
+      const existing = current.find((chat) => chat.id === id)
+      if (!existing) {
+        return current
+      }
+      const title = titleFrom(messages)
+      const same =
+        existing.title === title &&
+        existing.messages.length === messages.length &&
+        existing.messages.every(
+          (message, index) =>
+            message.id === messages[index]?.id &&
+            messageText(message) === messageText(messages[index]),
+        )
+      if (same) {
+        return current
+      }
+      const next = current
+        .map((chat) =>
+          chat.id === id
+            ? { ...chat, title, messages, updatedAt: Date.now() }
+            : chat,
+        )
+        .sort((left, right) => right.updatedAt - left.updatedAt)
+      saveChats(next)
+      return next
+    })
+  }, [])
+
+  function openChat(id: string) {
+    setActiveId(id)
+  }
+
+  function newChat() {
+    const current = chats.find((chat) => chat.id === activeId)
+    if (current && current.messages.length === 0) {
+      setQuery("")
+      setActiveId(current.id)
+      return
+    }
+    const chat = createChat()
+    const next = [chat, ...chats]
+    setChats(next)
+    saveChats(next)
+    setActiveId(chat.id)
+    setQuery("")
+  }
+
+  function deleteChat(id: string) {
+    const remaining = chats.filter((chat) => chat.id !== id)
+    const next = remaining.length > 0 ? remaining : [createChat()]
+    setChats(next)
+    saveChats(next)
+    if (id === activeId) {
+      setActiveId(next[0]?.id ?? null)
+    }
+  }
+
+  const active = chats.find((chat) => chat.id === activeId) ?? null
+
+  return (
+    <SidebarProvider className="h-svh">
+      <ChatSidebar
+        chats={chats}
+        activeId={activeId}
+        query={query}
+        ready={ready}
+        onQueryChange={setQuery}
+        onNewChat={newChat}
+        onSelect={openChat}
+        onDelete={deleteChat}
+      />
+      <SidebarInset className="min-h-0">
+        <header className="flex h-14 shrink-0 items-center gap-2 px-3">
+          <SidebarTrigger />
           <h1 className="text-sm font-medium">PatchAI</h1>
-          <ThemeButton />
+          <div className="ml-auto">
+            <ThemeButton />
+          </div>
         </header>
-        <div
-          className={
-            started
-              ? "flex min-h-0 flex-1 flex-col pb-4"
-              : "flex flex-1 flex-col items-center justify-center gap-6 pb-16"
-          }
-        >
-          {started ? (
-            <MessageScrollerProvider autoScroll>
-              <MessageScroller className="min-h-0 flex-1">
-                <MessageScrollerViewport aria-label="Conversation">
-                  <MessageScrollerContent
-                    aria-busy={busy}
-                    className="gap-8 py-6"
-                  >
-                    {messages.map((message) => {
-                      const own = message.role === "user"
-                      return (
-                        <MessageScrollerItem
-                          key={message.id}
-                          messageId={message.id}
-                          scrollAnchor={own}
-                        >
-                          <Message align={own ? "end" : "start"}>
-                            <MessageContent>
-                              <Bubble
-                                variant={own ? "muted" : "ghost"}
-                                align={own ? "end" : "start"}
-                              >
-                                <BubbleContent className="whitespace-pre-wrap text-base leading-7">
-                                  {messageText(message)}
-                                </BubbleContent>
-                              </Bubble>
-                            </MessageContent>
-                          </Message>
-                        </MessageScrollerItem>
-                      )
-                    })}
-                  </MessageScrollerContent>
-                </MessageScrollerViewport>
-                <MessageScrollerButton />
-              </MessageScroller>
-            </MessageScrollerProvider>
-          ) : (
-            <p className="text-center text-2xl tracking-tight">
-              How can I help you today?
-            </p>
-          )}
-          {composer}
-        </div>
-      </div>
-    </main>
+        {active ? (
+          <ChatThread
+            key={active.id}
+            chatId={active.id}
+            initialMessages={active.messages}
+            onMessages={remember}
+          />
+        ) : (
+          <div className="flex flex-1" />
+        )}
+      </SidebarInset>
+    </SidebarProvider>
   )
 }
