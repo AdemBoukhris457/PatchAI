@@ -14,6 +14,7 @@ from patchai.harness import build_agent
 
 _CHANNEL_MODULES = {
     "cli": "patchai.channels.cli",
+    "web": "patchai.channels.web",
 }
 
 
