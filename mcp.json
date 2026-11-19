@@ -1,3 +1,11 @@
 {
-  "mcpServers": {}
+  "mcpServers": {
+    "open_market_data": {
+      "command": "npx",
+      "args": ["-y", "-p", "open-market-data@0.2.0", "omd-mcp"]
+    },
+    "boleron": {
+      "url": "https://boleron.eu/api/mcp/"
+    }
+  }
 }
