@@ -8,6 +8,7 @@ import importlib
 from pathlib import Path
 
 from patchai.channels.registry import resolve
+from patchai.config.env import load_env
 from patchai.config.loader import load_settings
 from patchai.conversation import ask
 from patchai.harness import build_agent
@@ -20,7 +21,8 @@ _CHANNEL_MODULES = {
 
 async def main(config_path: Path | None = None) -> None:
     """Start the channel named in the configuration file."""
-    config_path = config_path or Path("config.toml")
+    config_path = (config_path or Path("config.toml")).resolve()
+    load_env(config_path.parent / ".env")
     settings = load_settings(config_path)
     module_name = _CHANNEL_MODULES.get(settings.channel)
     if module_name is None:
