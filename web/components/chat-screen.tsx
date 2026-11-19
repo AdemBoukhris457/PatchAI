@@ -13,6 +13,7 @@ import {
   type FormEvent,
 } from "react"
 
+import { AssistantReply } from "@/components/assistant-reply"
 import { ChatSidebar } from "@/components/chat-sidebar"
 import { Button } from "@/components/ui/button"
 import { Bubble, BubbleContent } from "@/components/ui/bubble"
@@ -210,8 +211,12 @@ function ChatThread({
                 aria-busy={busy}
                 className="mx-auto w-full max-w-3xl gap-8 px-4 py-6"
               >
-                {messages.map((message) => {
+                {messages.map((message, index) => {
                   const own = message.role === "user"
+                  const streaming =
+                    !own &&
+                    status === "streaming" &&
+                    index === messages.length - 1
                   return (
                     <MessageScrollerItem
                       key={message.id}
@@ -223,10 +228,20 @@ function ChatThread({
                           <Bubble
                             variant={own ? "muted" : "ghost"}
                             align={own ? "end" : "start"}
+                            className={own ? undefined : "w-full"}
                           >
-                            <BubbleContent className="whitespace-pre-wrap text-base leading-7">
-                              {messageText(message)}
-                            </BubbleContent>
+                            {own ? (
+                              <BubbleContent className="whitespace-pre-wrap text-base leading-7">
+                                {messageText(message)}
+                              </BubbleContent>
+                            ) : (
+                              <BubbleContent className="w-full overflow-visible">
+                                <AssistantReply
+                                  text={messageText(message)}
+                                  streaming={streaming}
+                                />
+                              </BubbleContent>
+                            )}
                           </Bubble>
                         </MessageContent>
                       </Message>
