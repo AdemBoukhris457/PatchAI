@@ -16,7 +16,7 @@ ROOT = Path(__file__).parents[1]
 def test_repository_settings_load() -> None:
     settings = load_settings(ROOT / "config.toml")
 
-    assert settings.channel == "cli"
+    assert settings.channel == "web"
     assert settings.model == "openai:gpt-6-luna"
     assert settings.plugins == ("example_clock",)
     assert settings.mcp_config == "mcp.json"

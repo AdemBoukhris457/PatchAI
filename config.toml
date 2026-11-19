@@ -1,5 +1,5 @@
 [channel]
-active = "cli"
+active = "web"
 
 [model]
 name = "openai:gpt-6-luna"
