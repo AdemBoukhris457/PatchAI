@@ -1,6 +1,8 @@
 """Load ``Settings`` from a TOML file."""
 
+import os
 import tomllib
+from dataclasses import replace
 from pathlib import Path
 
 from patchai.config.models import Settings
@@ -27,6 +29,14 @@ def load_settings(path: Path) -> Settings:
         plugins=tuple(enabled),
         mcp_config=_string(mcp, "mcp", "config"),
     )
+
+
+def apply_model_choice(settings: Settings) -> Settings:
+    """Use ``PATCHAI_MODEL`` when the env file chose a model."""
+    chosen = os.environ.get("PATCHAI_MODEL", "").strip()
+    if not chosen:
+        return settings
+    return replace(settings, model=chosen)
 
 
 def _table(data: dict[str, object], name: str) -> dict[str, object]:

@@ -6,7 +6,8 @@ from pathlib import Path
 import pytest
 
 from patchai.config.env import load_env
-from patchai.config.loader import load_settings
+from patchai.config.loader import apply_model_choice, load_settings
+from patchai.config.models import Settings
 from patchai.mcp.loader import load_mcp_servers
 
 ROOT = Path(__file__).parents[1]
@@ -44,6 +45,30 @@ def test_env_file_fills_only_missing_variables(
 
 def test_missing_env_file_is_ignored(tmp_path: Path) -> None:
     load_env(tmp_path / ".env")
+
+
+def test_env_model_replaces_the_file_model(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("PATCHAI_MODEL", "openai:gpt-6-luna")
+    settings = Settings(
+        channel="cli",
+        model="ollama:llama3.1",
+        plugins=(),
+        mcp_config="mcp.json",
+    )
+
+    assert apply_model_choice(settings).model == "openai:gpt-6-luna"
+
+
+def test_blank_env_model_keeps_the_file_model(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("PATCHAI_MODEL", "  ")
+    settings = Settings(
+        channel="cli",
+        model="ollama:llama3.1",
+        plugins=(),
+        mcp_config="mcp.json",
+    )
+
+    assert apply_model_choice(settings).model == "ollama:llama3.1"
 
 
 def test_missing_table_is_rejected(tmp_path: Path) -> None:
