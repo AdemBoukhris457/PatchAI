@@ -198,7 +198,7 @@ function ChatThread({
     <div
       className={
         started
-          ? "mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col px-4 pb-4"
+          ? "flex min-h-0 w-full flex-1 flex-col"
           : "mx-auto flex w-full max-w-3xl flex-1 flex-col items-center justify-center gap-6 px-4 pb-16"
       }
     >
@@ -206,7 +206,10 @@ function ChatThread({
         <MessageScrollerProvider autoScroll>
           <MessageScroller className="min-h-0 flex-1">
             <MessageScrollerViewport aria-label="Conversation">
-              <MessageScrollerContent aria-busy={busy} className="gap-8 py-6">
+              <MessageScrollerContent
+                aria-busy={busy}
+                className="mx-auto w-full max-w-3xl gap-8 px-4 py-6"
+              >
                 {messages.map((message) => {
                   const own = message.role === "user"
                   return (
@@ -240,7 +243,9 @@ function ChatThread({
           How can I help you today?
         </p>
       )}
-      {composer}
+      <div className={started ? "mx-auto w-full max-w-3xl px-4 pb-4" : "w-full"}>
+        {composer}
+      </div>
     </div>
   )
 }
