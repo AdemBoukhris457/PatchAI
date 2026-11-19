@@ -1,7 +1,7 @@
 "use client"
 
 import { useChat } from "@ai-sdk/react"
-import { TextStreamChatTransport, type UIMessage } from "ai"
+import { DefaultChatTransport, type UIMessage } from "ai"
 import { ArrowUpIcon } from "lucide-react"
 import { useTheme } from "next-themes"
 import {
@@ -88,7 +88,7 @@ function ChatThread({
   onMessages: (id: string, messages: UIMessage[]) => void
 }) {
   const transport = useMemo(
-    () => new TextStreamChatTransport({ api: "/api/chat" }),
+    () => new DefaultChatTransport({ api: "/api/chat" }),
     [],
   )
   const { messages, sendMessage, status, error, stop } = useChat({

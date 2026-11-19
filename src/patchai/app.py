@@ -10,7 +10,7 @@ from pathlib import Path
 from patchai.channels.registry import resolve
 from patchai.config.env import load_env
 from patchai.config.loader import apply_model_choice, load_settings
-from patchai.conversation import ask, stream_reply
+from patchai.conversation import ask, stream_events
 from patchai.harness import build_agent
 from patchai.mcp.loader import load_mcp_tools
 
@@ -41,8 +41,8 @@ async def main(config_path: Path | None = None) -> None:
 
     async def on_stream(session_id: str, user_id: str, text: str):
         del user_id
-        async for piece in stream_reply(agent, session_id, text):
-            yield piece
+        async for event in stream_events(agent, session_id, text):
+            yield event
 
     if settings.channel == "web":
         await channel.serve(on_stream)

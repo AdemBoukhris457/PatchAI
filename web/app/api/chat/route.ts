@@ -58,8 +58,9 @@ export async function POST(request: Request) {
     }
     return new Response(upstream.body, {
       headers: {
-        "content-type": "text/plain; charset=utf-8",
+        "content-type": "text/event-stream; charset=utf-8",
         "cache-control": "no-cache",
+        "x-vercel-ai-ui-message-stream": "v1",
       },
     })
   } catch {

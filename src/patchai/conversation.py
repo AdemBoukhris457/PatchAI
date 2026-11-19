@@ -84,13 +84,6 @@ async def ask(agent: Any, thread_id: str, text: str) -> str:
     return "".join(parts)
 
 
-async def stream_reply(agent: Any, thread_id: str, text: str) -> AsyncIterator[str]:
-    """Yield the assistant's text as the model produces it."""
-    async for event in stream_events(agent, thread_id, text):
-        if isinstance(event, TextDelta):
-            yield event.text
-
-
 async def stream_events(agent: Any, thread_id: str, text: str) -> AsyncIterator[Event]:
     """Yield text, reasoning and tool progress for one turn."""
     open_calls: dict[tuple[tuple[str, ...], int], str] = {}

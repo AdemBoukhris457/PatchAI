@@ -1,4 +1,4 @@
-"""The web channel returns one plain-text reply for one JSON turn."""
+"""The web channel answers one JSON turn as plain text or a UI message stream."""
 
 import asyncio
 import json
@@ -8,6 +8,7 @@ import urllib.request
 import pytest
 
 from patchai.channels.web import WebChannel
+from patchai.conversation import TextDelta
 
 
 @pytest.mark.asyncio
@@ -50,11 +51,11 @@ async def test_web_channel_returns_the_reply_as_plain_text() -> None:
 
 
 @pytest.mark.asyncio
-async def test_web_channel_writes_each_piece_of_a_stream() -> None:
+async def test_web_channel_streams_events_as_ui_message_parts() -> None:
     async def handler(session_id: str, user_id: str, text: str):
         del session_id, user_id, text
-        yield "hel"
-        yield "lo"
+        yield TextDelta("hel")
+        yield TextDelta("lo")
 
     channel = WebChannel("127.0.0.1", 0)
     task = asyncio.create_task(channel.serve(handler))
@@ -66,8 +67,8 @@ async def test_web_channel_writes_each_piece_of_a_stream() -> None:
         else:
             raise AssertionError("The web channel did not bind.")
 
-        status, body = await asyncio.to_thread(
-            _post,
+        status, body, headers = await asyncio.to_thread(
+            _post_with_headers,
             channel.port,
             {"thread_id": "web", "text": "hello"},
         )
@@ -76,10 +77,23 @@ async def test_web_channel_writes_each_piece_of_a_stream() -> None:
         await task
 
     assert status == 200
-    assert body == "hello"
+    assert headers["x-vercel-ai-ui-message-stream"] == "v1"
+    assert headers["Content-Type"].startswith("text/event-stream")
+    deltas = [
+        json.loads(line[6:])["delta"]
+        for line in body.split("\n\n")
+        if line.startswith("data: {") and '"text-delta"' in line
+    ]
+    assert deltas == ["hel", "lo"]
+    assert body.endswith("data: [DONE]\n\n")
 
 
 def _post(port: int, payload: dict[str, str]) -> tuple[int, str]:
+    status, body, _headers = _post_with_headers(port, payload)
+    return status, body
+
+
+def _post_with_headers(port: int, payload: dict[str, str]) -> tuple[int, str, dict[str, str]]:
     request = urllib.request.Request(
         f"http://127.0.0.1:{port}/chat",
         data=json.dumps(payload).encode(),
@@ -88,6 +102,6 @@ def _post(port: int, payload: dict[str, str]) -> tuple[int, str]:
     )
     try:
         with urllib.request.urlopen(request) as response:
-            return response.status, response.read().decode()
+            return response.status, response.read().decode(), dict(response.headers)
     except urllib.error.HTTPError as exc:
-        return exc.code, exc.read().decode()
+        return exc.code, exc.read().decode(), dict(exc.headers)

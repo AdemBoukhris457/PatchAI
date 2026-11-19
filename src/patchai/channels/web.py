@@ -1,8 +1,9 @@
 """HTTP channel for the local web app.
 
-One JSON turn comes in. A string handler is written once. An async
-generator is written as chunked text while the model is still producing
-it. The process keeps the agent so a thread survives across requests.
+One JSON turn comes in. A string handler is written once. A handler that
+yields agent events is written as the AI SDK UI message stream while the
+agent works, so the page can show text, reasoning and tool steps as they
+happen. The process keeps the agent so a thread survives across requests.
 """
 
 from __future__ import annotations
@@ -12,10 +13,11 @@ import json
 from collections.abc import AsyncIterator, Awaitable, Callable, Coroutine
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
+from patchai.channels import ui_stream
 from patchai.channels.registry import register
+from patchai.conversation import Event
 
-Reply = str | AsyncIterator[str]
-ReplyHandler = Callable[[str, str, str], Awaitable[Reply] | AsyncIterator[str]]
+ReplyHandler = Callable[[str, str, str], Awaitable[str] | AsyncIterator[Event]]
 
 _MAX_BODY = 1_000_000
 
@@ -65,45 +67,32 @@ def _plain(handler: BaseHTTPRequestHandler, status: int, text: str) -> None:
 def _stream(
     handler: BaseHTTPRequestHandler,
     loop: asyncio.AbstractEventLoop,
-    pieces: AsyncIterator[str],
+    events: AsyncIterator[Event],
 ) -> None:
-    """Write ``pieces`` as HTTP chunks, or 500 if the first piece fails."""
-    queue: asyncio.Queue[str | BaseException | None] = asyncio.Queue()
+    """Write ``events`` as UI message stream parts in HTTP chunks."""
+    queue: asyncio.Queue[str | None] = asyncio.Queue()
 
     async def produce() -> None:
         try:
-            async for piece in pieces:
-                if piece:
-                    await queue.put(piece)
+            async for piece in ui_stream.encode(events):
+                await queue.put(piece)
+        finally:
             await queue.put(None)
-        except Exception as exc:
-            await queue.put(exc)
 
     asyncio.run_coroutine_threadsafe(produce(), loop)
 
-    def take() -> str | BaseException | None:
+    def take() -> str | None:
         return asyncio.run_coroutine_threadsafe(queue.get(), loop).result()
-
-    first = take()
-    if isinstance(first, BaseException):
-        _plain(handler, 500, "PatchAI could not answer.")
-        return
 
     handler.protocol_version = "HTTP/1.1"
     handler.send_response(200)
-    handler.send_header("Content-Type", "text/plain; charset=utf-8")
-    handler.send_header("Cache-Control", "no-cache")
+    for name, value in ui_stream.HEADERS.items():
+        handler.send_header(name, value)
     handler.send_header("Transfer-Encoding", "chunked")
     handler.send_header("Connection", "close")
     handler.end_headers()
-    if first:
-        _write_chunk(handler, first)
-    while True:
-        item = take()
-        if item is None or isinstance(item, BaseException):
-            break
-        if item:
-            _write_chunk(handler, item)
+    while (piece := take()) is not None:
+        _write_chunk(handler, piece)
     handler.wfile.write(b"0\r\n\r\n")
     handler.wfile.flush()
 
