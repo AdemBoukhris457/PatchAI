@@ -50,14 +50,17 @@ export async function POST(request: Request) {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ thread_id: threadId, text }),
     })
-    const reply = await upstream.text()
-    if (!upstream.ok) {
+    if (!upstream.ok || upstream.body === null) {
+      const reply = await upstream.text()
       return new Response(reply || "PatchAI could not answer.", {
         status: 502,
       })
     }
-    return new Response(reply, {
-      headers: { "content-type": "text/plain; charset=utf-8" },
+    return new Response(upstream.body, {
+      headers: {
+        "content-type": "text/plain; charset=utf-8",
+        "cache-control": "no-cache",
+      },
     })
   } catch {
     return new Response(
