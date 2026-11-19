@@ -49,6 +49,36 @@ async def test_web_channel_returns_the_reply_as_plain_text() -> None:
     assert missing_body == "A message is required."
 
 
+@pytest.mark.asyncio
+async def test_web_channel_writes_each_piece_of_a_stream() -> None:
+    async def handler(session_id: str, user_id: str, text: str):
+        del session_id, user_id, text
+        yield "hel"
+        yield "lo"
+
+    channel = WebChannel("127.0.0.1", 0)
+    task = asyncio.create_task(channel.serve(handler))
+    try:
+        for _ in range(50):
+            if channel.ready:
+                break
+            await asyncio.sleep(0.02)
+        else:
+            raise AssertionError("The web channel did not bind.")
+
+        status, body = await asyncio.to_thread(
+            _post,
+            channel.port,
+            {"thread_id": "web", "text": "hello"},
+        )
+    finally:
+        channel.close()
+        await task
+
+    assert status == 200
+    assert body == "hello"
+
+
 def _post(port: int, payload: dict[str, str]) -> tuple[int, str]:
     request = urllib.request.Request(
         f"http://127.0.0.1:{port}/chat",

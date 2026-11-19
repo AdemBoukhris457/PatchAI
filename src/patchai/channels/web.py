@@ -1,17 +1,21 @@
 """HTTP channel for the local web app.
 
-One JSON turn comes in, and the assistant reply goes out as plain text.
-The process keeps the agent so a thread survives from one request to the next.
+One JSON turn comes in. A string handler is written once. An async
+generator is written as chunked text while the model is still producing
+it. The process keeps the agent so a thread survives across requests.
 """
 
 from __future__ import annotations
 
 import asyncio
 import json
+from collections.abc import AsyncIterator, Awaitable, Callable, Coroutine
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from patchai.channels.protocol import TurnHandler
 from patchai.channels.registry import register
+
+Reply = str | AsyncIterator[str]
+ReplyHandler = Callable[[str, str, str], Awaitable[Reply] | AsyncIterator[str]]
 
 _MAX_BODY = 1_000_000
 
@@ -33,7 +37,7 @@ class WebChannel:
         if httpd is not None:
             httpd.shutdown()
 
-    async def serve(self, handler: TurnHandler) -> None:
+    async def serve(self, handler: ReplyHandler) -> None:
         """Accept ``POST /chat`` until ``close`` is called."""
         loop = asyncio.get_running_loop()
         httpd = ThreadingHTTPServer((self.host, self.port), _chat_handler(loop, handler))
@@ -58,9 +62,63 @@ def _plain(handler: BaseHTTPRequestHandler, status: int, text: str) -> None:
     handler.wfile.write(body)
 
 
+def _stream(
+    handler: BaseHTTPRequestHandler,
+    loop: asyncio.AbstractEventLoop,
+    pieces: AsyncIterator[str],
+) -> None:
+    """Write ``pieces`` as HTTP chunks, or 500 if the first piece fails."""
+    queue: asyncio.Queue[str | BaseException | None] = asyncio.Queue()
+
+    async def produce() -> None:
+        try:
+            async for piece in pieces:
+                if piece:
+                    await queue.put(piece)
+            await queue.put(None)
+        except Exception as exc:
+            await queue.put(exc)
+
+    asyncio.run_coroutine_threadsafe(produce(), loop)
+
+    def take() -> str | BaseException | None:
+        return asyncio.run_coroutine_threadsafe(queue.get(), loop).result()
+
+    first = take()
+    if isinstance(first, BaseException):
+        _plain(handler, 500, "PatchAI could not answer.")
+        return
+
+    handler.protocol_version = "HTTP/1.1"
+    handler.send_response(200)
+    handler.send_header("Content-Type", "text/plain; charset=utf-8")
+    handler.send_header("Cache-Control", "no-cache")
+    handler.send_header("Transfer-Encoding", "chunked")
+    handler.send_header("Connection", "close")
+    handler.end_headers()
+    if first:
+        _write_chunk(handler, first)
+    while True:
+        item = take()
+        if item is None or isinstance(item, BaseException):
+            break
+        if item:
+            _write_chunk(handler, item)
+    handler.wfile.write(b"0\r\n\r\n")
+    handler.wfile.flush()
+
+
+def _write_chunk(handler: BaseHTTPRequestHandler, text: str) -> None:
+    data = text.encode("utf-8")
+    handler.wfile.write(f"{len(data):X}\r\n".encode("ascii"))
+    handler.wfile.write(data)
+    handler.wfile.write(b"\r\n")
+    handler.wfile.flush()
+
+
 def _chat_handler(
     loop: asyncio.AbstractEventLoop,
-    handler: TurnHandler,
+    handler: ReplyHandler,
 ) -> type[BaseHTTPRequestHandler]:
     class ChatHandler(BaseHTTPRequestHandler):
         def do_POST(self) -> None:  # noqa: N802
@@ -91,10 +149,14 @@ def _chat_handler(
             if not isinstance(thread_id, str) or not thread_id.strip():
                 _plain(self, 400, "A thread id is required.")
                 return
-            future = asyncio.run_coroutine_threadsafe(
-                handler(thread_id.strip(), "local", text.strip()),
-                loop,
-            )
+            result = handler(thread_id.strip(), "local", text.strip())
+            if hasattr(result, "__aiter__"):
+                _stream(self, loop, result)
+                return
+            if not isinstance(result, Coroutine):
+                _plain(self, 500, "PatchAI could not answer.")
+                return
+            future = asyncio.run_coroutine_threadsafe(result, loop)
             try:
                 reply = future.result()
             except Exception:

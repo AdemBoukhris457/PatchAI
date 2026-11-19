@@ -10,7 +10,7 @@ from pathlib import Path
 from patchai.channels.registry import resolve
 from patchai.config.env import load_env
 from patchai.config.loader import apply_model_choice, load_settings
-from patchai.conversation import ask
+from patchai.conversation import ask, stream_reply
 from patchai.harness import build_agent
 
 _CHANNEL_MODULES = {
@@ -36,7 +36,15 @@ async def main(config_path: Path | None = None) -> None:
         del user_id
         return await ask(agent, session_id, text)
 
-    await channel.serve(on_message)
+    async def on_stream(session_id: str, user_id: str, text: str):
+        del user_id
+        async for piece in stream_reply(agent, session_id, text):
+            yield piece
+
+    if settings.channel == "web":
+        await channel.serve(on_stream)
+    else:
+        await channel.serve(on_message)
 
 
 def run() -> None:
