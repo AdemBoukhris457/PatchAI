@@ -18,7 +18,7 @@ def test_repository_settings_load() -> None:
 
     assert settings.channel == "web"
     assert settings.model == "openai:gpt-6-luna"
-    assert settings.plugins == ("example_clock",)
+    assert settings.plugins == ("example_clock", "openfema_flood")
     assert settings.mcp_config == "mcp.json"
 
 

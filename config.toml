@@ -5,7 +5,7 @@ active = "web"
 name = "openai:gpt-6-luna"
 
 [plugins]
-enabled = ["example_clock"]
+enabled = ["example_clock", "openfema_flood"]
 
 [mcp]
 config = "mcp.json"
