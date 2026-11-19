@@ -23,7 +23,7 @@ def test_repository_settings_load() -> None:
 
 
 def test_repository_mcp_config_is_an_object() -> None:
-    assert load_mcp_servers(ROOT / "mcp.json") == {}
+    assert set(load_mcp_servers(ROOT / "mcp.json")) == {"open_market_data", "boleron"}
 
 
 def test_env_file_fills_only_missing_variables(
