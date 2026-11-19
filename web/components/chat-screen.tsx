@@ -13,6 +13,7 @@ import {
   type FormEvent,
 } from "react"
 
+import { ReasoningStep, ToolStep } from "@/components/agent-steps"
 import { AssistantReply } from "@/components/assistant-reply"
 import { ChatSidebar } from "@/components/chat-sidebar"
 import { Button } from "@/components/ui/button"
@@ -76,6 +77,35 @@ function ThemeButton() {
       {dark ? "Light" : "Dark"}
     </Button>
   )
+}
+
+function AssistantParts({
+  message,
+  streaming,
+}: {
+  message: UIMessage
+  streaming: boolean
+}) {
+  const last = message.parts.length - 1
+  return message.parts.map((part, index) => {
+    const key = `${message.id}-${index}`
+    switch (part.type) {
+      case "text":
+        return (
+          <AssistantReply
+            key={key}
+            text={part.text}
+            streaming={streaming && index === last}
+          />
+        )
+      case "reasoning":
+        return <ReasoningStep key={key} part={part} />
+      case "dynamic-tool":
+        return <ToolStep key={part.toolCallId} part={part} />
+      default:
+        return null
+    }
+  })
 }
 
 function ChatThread({
@@ -235,9 +265,9 @@ function ChatThread({
                                 {messageText(message)}
                               </BubbleContent>
                             ) : (
-                              <BubbleContent className="w-full overflow-visible">
-                                <AssistantReply
-                                  text={messageText(message)}
+                              <BubbleContent className="flex w-full flex-col gap-3 overflow-visible">
+                                <AssistantParts
+                                  message={message}
                                   streaming={streaming}
                                 />
                               </BubbleContent>
@@ -291,7 +321,8 @@ export function ChatScreen() {
         existing.messages.every(
           (message, index) =>
             message.id === messages[index]?.id &&
-            messageText(message) === messageText(messages[index]),
+            JSON.stringify(message.parts) ===
+              JSON.stringify(messages[index]?.parts),
         )
       if (same) {
         return current
