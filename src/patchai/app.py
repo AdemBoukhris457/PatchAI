@@ -12,6 +12,7 @@ from patchai.config.env import load_env
 from patchai.config.loader import apply_model_choice, load_settings
 from patchai.conversation import ask, stream_reply
 from patchai.harness import build_agent
+from patchai.mcp.loader import load_mcp_tools
 
 _CHANNEL_MODULES = {
     "cli": "patchai.channels.cli",
@@ -29,7 +30,9 @@ async def main(config_path: Path | None = None) -> None:
         known = ", ".join(sorted(_CHANNEL_MODULES))
         raise LookupError(f"Unknown channel '{settings.channel}'. Known channels: {known}.")
     importlib.import_module(module_name)
-    agent = build_agent(settings, root=config_path.resolve().parent)
+    root = config_path.parent
+    mcp_tools = await load_mcp_tools(root / settings.mcp_config)
+    agent = build_agent(settings, root=root, mcp_tools=mcp_tools)
     channel = resolve(settings.channel)
 
     async def on_message(session_id: str, user_id: str, text: str) -> str:

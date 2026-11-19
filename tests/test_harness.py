@@ -2,6 +2,7 @@
 
 from langchain_core.language_models.fake_chat_models import GenericFakeChatModel
 from langchain_core.messages import AIMessage
+from langchain_core.tools import tool
 
 from patchai.config.models import Settings
 from patchai.harness import build_agent
@@ -23,9 +24,15 @@ def test_build_agent_binds_plugin_tools_and_replies() -> None:
             bound_tool_names.extend(getattr(tool, "name", "") for tool in tools)
             return self
 
+    @tool
+    def premium(age: int) -> str:
+        """Return a sample yearly premium."""
+        return str(age)
+
     agent = build_agent(
         settings,
         model=_RecordingModel(messages=iter([AIMessage(content="hello from patchai")])),
+        mcp_tools=[premium],
     )
 
     result = agent.invoke(
@@ -34,4 +41,5 @@ def test_build_agent_binds_plugin_tools_and_replies() -> None:
     )
 
     assert "current_time" in bound_tool_names
+    assert "premium" in bound_tool_names
     assert result["messages"][-1].content == "hello from patchai"

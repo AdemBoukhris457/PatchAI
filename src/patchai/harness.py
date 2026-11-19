@@ -7,11 +7,13 @@ project memory, on-demand skills, and a store for preferences that should
 outlive one conversation thread.
 """
 
+from collections.abc import Sequence
 from pathlib import Path
 
 from deepagents import FilesystemPermission, create_deep_agent
 from deepagents.backends import CompositeBackend, FilesystemBackend, StateBackend, StoreBackend
 from langchain_core.language_models import BaseChatModel
+from langchain_core.tools import BaseTool
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.store.memory import InMemoryStore
@@ -57,6 +59,7 @@ def build_agent(
     *,
     model: BaseChatModel | None = None,
     root: Path | None = None,
+    mcp_tools: Sequence[BaseTool] = (),
 ) -> CompiledStateGraph:
     """Create the agent for ``settings``.
 
@@ -66,10 +69,13 @@ def build_agent(
 
     Pass ``model`` to supply an already constructed chat model. Otherwise the
     ``provider:model`` string in ``settings`` is resolved by Deep Agents.
+
+    ``mcp_tools`` are the tools already loaded from the MCP servers.
     """
     project_root = (root or Path.cwd()).resolve()
     store = InMemoryStore()
     tools = [tool for plugin in load_enabled(settings.plugins) for tool in plugin.tools()]
+    tools.extend(mcp_tools)
     return create_deep_agent(
         model=model if model is not None else settings.model,
         tools=tools,

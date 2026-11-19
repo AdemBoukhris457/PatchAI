@@ -12,6 +12,7 @@ license = { text = "MIT" }
 authors = [{ name = "Adem Boukhris" }]
 dependencies = [
     "deepagents>=0.5.2,<0.6",
+    "langchain[mcp]>=1.4.0",
     "langchain-openai>=1.1.12",
 ]
 
