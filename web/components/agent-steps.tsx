@@ -3,6 +3,7 @@
 import type { DynamicToolUIPart, ReasoningUIPart } from "ai"
 import { CheckIcon, ChevronRightIcon, XIcon } from "lucide-react"
 import { useId, useState, type ReactNode } from "react"
+import { Streamdown } from "streamdown"
 
 import { Spinner } from "@/components/ui/spinner"
 import { toolLabel, toolSummary } from "@/lib/tool-labels"
@@ -22,6 +23,12 @@ function busy(part: ActivityPart) {
   return part.type === "reasoning" ? part.state === "streaming" : !finished(part)
 }
 
+/** The last bold heading in a reasoning summary, such as "Checking the rates". */
+function latestHeading(text: string) {
+  const headings = [...text.matchAll(/\*\*([^*\n]+)\*\*/g)]
+  return headings.at(-1)?.[1].trim()
+}
+
 function headline(parts: ActivityPart[], working: boolean) {
   const tools = parts.filter(
     (part): part is DynamicToolUIPart => part.type === "dynamic-tool",
@@ -30,6 +37,9 @@ function headline(parts: ActivityPart[], working: boolean) {
     const current = parts.findLast(busy)
     if (current?.type === "dynamic-tool") {
       return toolLabel(current.toolName, false)
+    }
+    if (current?.type === "reasoning") {
+      return latestHeading(current.text) ?? "Thinking"
     }
     return "Thinking"
   }
@@ -45,10 +55,12 @@ function headline(parts: ActivityPart[], working: boolean) {
 function Reveal({
   id,
   open,
+  lingers = false,
   children,
 }: {
   id?: string
   open: boolean
+  lingers?: boolean
   children: ReactNode
 }) {
   return (
@@ -58,6 +70,7 @@ function Reveal({
       className={cn(
         "grid transition-[grid-template-rows,opacity] duration-200 ease-out motion-reduce:transition-none",
         open ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0",
+        !open && lingers && "delay-700",
       )}
     >
       <div className="min-h-0 overflow-hidden">{children}</div>
@@ -168,9 +181,12 @@ function Step({ part }: { part: ActivityPart }) {
         <Marker part={part} />
       </span>
       {part.type === "reasoning" ? (
-        <p className="py-1 text-sm leading-6 whitespace-pre-wrap text-muted-foreground">
+        <Streamdown
+          className="py-1 text-sm leading-6 text-muted-foreground [&_strong]:font-medium [&_strong]:text-foreground/80 [&>*]:my-1.5 [&>*:first-child]:mt-0 [&>*:last-child]:mb-0"
+          isAnimating={part.state === "streaming"}
+        >
           {part.text}
-        </p>
+        </Streamdown>
       ) : (
         <ToolRow part={part} />
       )}
@@ -193,6 +209,16 @@ export function AgentActivity({
   const open = choice ?? working
   const id = useId()
 
+  if (parts.length === 0) {
+    return (
+      <p className="self-start py-1 text-sm text-muted-foreground">
+        <span className={cn(working && "activity-shimmer")}>
+          {headline(parts, working)}
+        </span>
+      </p>
+    )
+  }
+
   return (
     <div className="flex flex-col">
       <button
@@ -213,7 +239,7 @@ export function AgentActivity({
           )}
         />
       </button>
-      <Reveal id={id} open={open}>
+      <Reveal id={id} open={open} lingers={choice === null}>
         <ol className="mt-1 ml-2 flex flex-col border-l border-border pb-1">
           {parts.map((part, index) => (
             <Step

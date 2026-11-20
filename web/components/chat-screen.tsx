@@ -38,7 +38,6 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar"
-import { Spinner } from "@/components/ui/spinner"
 import {
   createChat,
   loadChats,
@@ -108,6 +107,9 @@ function AssistantParts({
   streaming: boolean
 }) {
   const items = segments(message.parts)
+  if (items.length === 0 && streaming) {
+    return <AgentActivity parts={[]} working />
+  }
   return items.map((item, index) => {
     const key = `${message.id}-${index}`
     const live = streaming && index === items.length - 1
@@ -181,12 +183,6 @@ function ChatThread({
       <p role="status" className="sr-only">
         {busy ? "PatchAI is replying." : announcement}
       </p>
-      {busy ? (
-        <p className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Spinner role="presentation" aria-hidden="true" />
-          PatchAI is replying.
-        </p>
-      ) : null}
       {error ? (
         <p role="alert" className="text-sm text-destructive">
           {error.message}
@@ -289,6 +285,15 @@ function ChatThread({
                     </MessageScrollerItem>
                   )
                 })}
+                {status === "submitted" ? (
+                  <MessageScrollerItem key="pending" messageId="pending">
+                    <Message align="start">
+                      <MessageContent>
+                        <AgentActivity parts={[]} working />
+                      </MessageContent>
+                    </Message>
+                  </MessageScrollerItem>
+                ) : null}
               </MessageScrollerContent>
             </MessageScrollerViewport>
             <MessageScrollerButton />
