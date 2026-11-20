@@ -16,6 +16,7 @@
     "@assistant-ui/ai-sdk": "^0.0.19",
     "@assistant-ui/react": "^0.15.37",
     "@assistant-ui/react-markdown": "^0.14.26",
+    "@assistant-ui/react-streamdown": "^0.3.23",
     "@base-ui/react": "^1.9.0",
     "@shadcn/react": "^0.3.1",
     "@streamdown/code": "^2.0.1",

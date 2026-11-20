@@ -9,13 +9,16 @@ import { ChainOfThought, ReasoningTrace } from "@/components/chain-trace";
 import { File, getFileHref } from "@/components/file";
 import { ThreadFollowupSuggestions } from "@/components/follow-up-suggestions.aui";
 import { Image } from "@/components/image";
-import { MarkdownText } from "@/components/markdown-text";
+import { normalizeMath } from "@/lib/math";
 import { Reasoning } from "@/components/reasoning.aui";
 import { ToolFallback } from "@/components/tool-fallback.aui";
 import { TooltipIconButton } from "@/components/tooltip-icon-button";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { StreamdownTextPrimitive } from "@assistant-ui/react-streamdown";
+import { code } from "@streamdown/code";
+import { math } from "@streamdown/math";
 import {
   ActionBarMorePrimitive,
   ActionBarPrimitive,
@@ -545,6 +548,27 @@ const MessageError: FC = () => {
   );
 };
 
+const answerPlugins = { code, math };
+
+const answerMotion = {
+  animation: "blurIn" as const,
+  duration: 250,
+  easing: "ease-out",
+};
+
+const AnswerText: FC = () => {
+  const running = useAuiState((state) => state.part.status.type === "running");
+  return (
+    <StreamdownTextPrimitive
+      caret="circle"
+      plugins={answerPlugins}
+      preprocess={normalizeMath}
+      animated={running ? answerMotion : false}
+      className="[&>*:first-child]:mt-0 [&>*:last-child]:mb-0"
+    />
+  );
+};
+
 const AssistantMessage: FC = () => {
   const {
     ToolFallback: ToolFallbackComponent = ToolFallback,
@@ -597,7 +621,7 @@ const AssistantMessage: FC = () => {
                 );
               }
               case "text":
-                return <MarkdownText />;
+                return <AnswerText />;
               case "reasoning":
                 return <Reasoning {...part} />;
               case "tool-call":
