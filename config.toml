@@ -4,6 +4,10 @@ active = "web"
 [model]
 name = "openai:gpt-6-luna"
 
+[model.options.openai]
+use_responses_api = true
+reasoning = { summary = "auto" }
+
 [plugins]
 enabled = ["example_clock", "openfema_flood"]
 

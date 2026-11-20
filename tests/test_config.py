@@ -20,6 +20,9 @@ def test_repository_settings_load() -> None:
     assert settings.model == "openai:gpt-6-luna"
     assert settings.plugins == ("example_clock", "openfema_flood")
     assert settings.mcp_config == "mcp.json"
+    assert settings.model_options == {
+        "openai": {"use_responses_api": True, "reasoning": {"summary": "auto"}}
+    }
 
 
 def test_repository_mcp_config_is_an_object() -> None:
