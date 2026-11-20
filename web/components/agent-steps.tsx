@@ -56,24 +56,14 @@ function headline(parts: ActivityPart[], working: boolean, seconds: number | nul
 function Reveal({
   id,
   open,
-  lingers = false,
   children,
 }: {
   id?: string
   open: boolean
-  lingers?: boolean
   children: ReactNode
 }) {
   return (
-    <div
-      id={id}
-      inert={!open}
-      className={cn(
-        "grid transition-[grid-template-rows,opacity] duration-200 ease-out motion-reduce:transition-none",
-        open ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0",
-        !open && lingers && "delay-700",
-      )}
-    >
+    <div id={id} inert={!open} data-open={open} className="activity-reveal">
       <div className="min-h-0 overflow-hidden">{children}</div>
     </div>
   )
@@ -209,7 +199,7 @@ function StatusText({ label, shimmer }: { label: string | null; shimmer: boolean
 
 /**
  * One run of agent work inside a reply. It stays open with a live headline
- * while the agent works, then folds into a one-line summary.
+ * until the answer finishes, then folds into a one-line summary.
  */
 export function AgentActivity({
   parts,
@@ -253,12 +243,12 @@ export function AgentActivity({
         <ChevronRightIcon
           aria-hidden="true"
           className={cn(
-            "size-3.5 transition-transform duration-200 motion-reduce:transition-none",
+            "size-3.5 transition-transform duration-250 ease-[cubic-bezier(0.23,1,0.32,1)] motion-reduce:transition-none",
             open && "rotate-90",
           )}
         />
       </button>
-      <Reveal id={id} open={open} lingers={choice === null}>
+      <Reveal id={id} open={open}>
         <ol className="mt-1 ml-2 flex flex-col border-l border-border pb-1">
           {parts.map((part, index) => (
             <Step

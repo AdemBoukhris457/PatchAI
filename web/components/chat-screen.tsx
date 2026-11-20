@@ -110,13 +110,20 @@ function AssistantParts({
   if (items.length === 0 && streaming) {
     return <AgentActivity parts={[]} working />
   }
+  const liveActivity = streaming
+    ? items.findLastIndex((item) => item.kind === "activity")
+    : -1
   return items.map((item, index) => {
     const key = `${message.id}-${index}`
     const live = streaming && index === items.length - 1
     return item.kind === "text" ? (
       <AssistantReply key={key} text={item.text} streaming={live} />
     ) : (
-      <AgentActivity key={key} parts={item.parts} working={live} />
+      <AgentActivity
+        key={key}
+        parts={item.parts}
+        working={index === liveActivity}
+      />
     )
   })
 }

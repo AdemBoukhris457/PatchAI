@@ -146,6 +146,20 @@
   animation: activity-shimmer 2s linear infinite;
 }
 
+.activity-reveal {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition:
+    grid-template-rows 250ms cubic-bezier(0.23, 1, 0.32, 1),
+    opacity 200ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.activity-reveal[data-open="true"] {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+
 .activity-arrive {
   animation: activity-arrive 250ms ease-out both;
 }
@@ -201,6 +215,9 @@
   .activity-arrive,
   [data-sd-animate] {
     animation: none;
+  }
+  .activity-reveal {
+    transition: none;
   }
 }
 
