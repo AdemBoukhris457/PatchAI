@@ -6,6 +6,12 @@ import { useId, useState, type ReactNode } from "react"
 import { Streamdown } from "streamdown"
 
 import { Spinner } from "@/components/ui/spinner"
+
+const streamMotion = {
+  animation: "blurIn" as const,
+  duration: 250,
+  easing: "ease-out",
+}
 import { toolLabel, toolSummary } from "@/lib/tool-labels"
 import { cn } from "@/lib/utils"
 
@@ -176,13 +182,15 @@ function Step({ part }: { part: ActivityPart }) {
   const helper =
     part.type === "dynamic-tool" && part.toolMetadata?.subagent === true
   return (
-    <li className={cn("relative pl-5", helper && "ml-4")}>
+    <li className={cn("activity-arrive relative pl-5", helper && "ml-4")}>
       <span className="absolute top-[7px] -left-2 flex size-4 items-center justify-center bg-background">
         <Marker part={part} />
       </span>
       {part.type === "reasoning" ? (
         <Streamdown
           className="py-1 text-sm leading-6 text-muted-foreground [&_strong]:font-medium [&_strong]:text-foreground/80 [&>*]:my-1.5 [&>*:first-child]:mt-0 [&>*:last-child]:mb-0"
+          animated={part.state === "streaming" ? streamMotion : false}
+          caret={part.state === "streaming" ? "circle" : undefined}
           isAnimating={part.state === "streaming"}
         >
           {part.text}

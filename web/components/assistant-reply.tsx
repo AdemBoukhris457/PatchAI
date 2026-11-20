@@ -9,6 +9,12 @@ import { normalizeMath } from "@/lib/math"
 
 const plugins = { code, math }
 
+const streamMotion = {
+  animation: "blurIn" as const,
+  duration: 250,
+  easing: "ease-out",
+}
+
 export const AssistantReply = memo(function AssistantReply({
   text,
   streaming,
@@ -20,6 +26,8 @@ export const AssistantReply = memo(function AssistantReply({
     <Streamdown
       className="text-base leading-7 [&>*:first-child]:mt-0 [&>*:last-child]:mb-0"
       plugins={plugins}
+      animated={streaming ? streamMotion : false}
+      caret={streaming ? "circle" : undefined}
       isAnimating={streaming}
     >
       {normalizeMath(text)}
