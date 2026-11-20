@@ -2,11 +2,11 @@
 
 import type { DynamicToolUIPart, ReasoningUIPart } from "ai"
 import { CheckIcon, ChevronRightIcon, XIcon } from "lucide-react"
-import { useEffect, useId, useState, type ReactNode } from "react"
+import { useEffect, useId, useRef, useState, type ReactNode } from "react"
 import { Streamdown } from "streamdown"
 
 import { Spinner } from "@/components/ui/spinner"
-import { toolLabel, toolSummary } from "@/lib/tool-labels"
+import { toolLabel, toolSummary, workSummary } from "@/lib/tool-labels"
 import { cn } from "@/lib/utils"
 
 export type ActivityPart = DynamicToolUIPart | ReasoningUIPart
@@ -44,12 +44,48 @@ function headline(parts: ActivityPart[], working: boolean, seconds: number | nul
     }
     return null
   }
-  if (tools.length === 0) {
-    return seconds === null ? "Thought it through" : `Thought for ${seconds}s`
-  }
-  const used = `Used ${tools.length} ${tools.length === 1 ? "tool" : "tools"}`
   const failures = tools.filter(failed).length
-  return failures > 0 ? `${used}, ${failures} failed` : used
+  const work = workSummary(
+    tools.filter((part) => !failed(part)).map((part) => toolLabel(part.toolName, true)),
+  )
+  const line = [
+    seconds === null ? null : `Worked for ${seconds}s`,
+    work || null,
+    failures > 0 ? `${failures} failed` : null,
+  ].filter((part) => part !== null)
+  return line.length > 0 ? line.join(" · ") : "Worked"
+}
+
+const FOLD_MS = 250
+
+/** Keep the thread still while the trace height changes. */
+function pinScroll(node: HTMLElement) {
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    return
+  }
+  let scroller: HTMLElement | null = node.parentElement
+  while (scroller) {
+    const overflow = getComputedStyle(scroller).overflowY
+    if (overflow === "auto" || overflow === "scroll") {
+      break
+    }
+    scroller = scroller.parentElement
+  }
+  if (!scroller) {
+    return
+  }
+  const pinned = scroller
+  const top = pinned.scrollTop
+  const started = performance.now()
+  let frame = 0
+  const tick = (now: number) => {
+    pinned.scrollTop = top
+    if (now - started < FOLD_MS) {
+      frame = requestAnimationFrame(tick)
+    }
+  }
+  frame = requestAnimationFrame(tick)
+  return () => cancelAnimationFrame(frame)
 }
 
 /** Height-animated region that stays out of the tab order while closed. */
@@ -167,7 +203,7 @@ function Step({ part }: { part: ActivityPart }) {
   const helper =
     part.type === "dynamic-tool" && part.toolMetadata?.subagent === true
   return (
-    <li className={cn("activity-arrive relative pl-5", helper && "ml-4")}>
+    <li className={cn("activity-step relative pl-5", helper && "ml-4")}>
       <span className="absolute top-[7px] -left-2 flex size-4 items-center justify-center bg-background">
         <Marker part={part} />
       </span>
@@ -208,8 +244,15 @@ export function AgentActivity({
   parts: ActivityPart[]
   working: boolean
 }) {
-  const [choice, setChoice] = useState<boolean | null>(null)
+  const [open, setOpen] = useState(working)
+  const [seenWorking, setSeenWorking] = useState(working)
   const [seconds, setSeconds] = useState<number | null>(null)
+  const rootRef = useRef<HTMLDivElement>(null)
+  const firstOpen = useRef(true)
+  if (seenWorking !== working) {
+    setSeenWorking(working)
+    setOpen(working)
+  }
   useEffect(() => {
     if (!working) return
     const start = Date.now()
@@ -218,7 +261,15 @@ export function AgentActivity({
       setSeconds(elapsed)
     }
   }, [working])
-  const open = choice ?? working
+  useEffect(() => {
+    if (firstOpen.current) {
+      firstOpen.current = false
+      return
+    }
+    const node = rootRef.current
+    if (!node) return
+    return pinScroll(node)
+  }, [open])
   const id = useId()
   const label = headline(parts, working, seconds)
 
@@ -231,12 +282,12 @@ export function AgentActivity({
   }
 
   return (
-    <div className="flex flex-col">
+    <div ref={rootRef} className="flex flex-col">
       <button
         type="button"
         aria-expanded={open}
         aria-controls={id}
-        onClick={() => setChoice(!open)}
+        onClick={() => setOpen(!open)}
         className="group/head flex items-center gap-1 self-start rounded-md py-1 text-sm text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
       >
         <StatusText label={label} shimmer={working} />

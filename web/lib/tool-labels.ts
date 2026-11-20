@@ -19,7 +19,41 @@ export function toolLabel(name: string, finished: boolean) {
   if (known) {
     return finished ? known.done : known.running
   }
-  return finished ? `Used ${humanize(name)}` : `Using ${humanize(name)}`
+  return finished ? `Checked ${humanize(name)}` : `Checking ${humanize(name)}`
+}
+
+function lowerFirst(value: string) {
+  return value.charAt(0).toLowerCase() + value.slice(1)
+}
+
+function repeated(label: string, count: number) {
+  if (count === 1) {
+    return label
+  }
+  if (label === "Read a file") {
+    return `Read ${count} files`
+  }
+  return `${label} ${count} times`
+}
+
+/**
+ * The closed line for a finished run. One or two actions are named.
+ * A longer run keeps those two and counts the rest.
+ */
+export function workSummary(labels: string[]) {
+  if (labels.length === 0) {
+    return ""
+  }
+  if (labels.every((label) => label === labels[0])) {
+    return repeated(labels[0], labels.length)
+  }
+  if (labels.length === 2) {
+    return `${labels[0]} and ${lowerFirst(labels[1])}`
+  }
+  if (labels.length === 3) {
+    return `${labels[0]}, ${lowerFirst(labels[1])}, and ${lowerFirst(labels[2])}`
+  }
+  return `${labels[0]}, ${lowerFirst(labels[1])}, and ${labels.length - 2} more`
 }
 
 /** The first few plain values of a tool's input, such as a ticker or a state. */
