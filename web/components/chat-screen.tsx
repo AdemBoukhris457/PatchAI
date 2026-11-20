@@ -13,7 +13,7 @@ import {
   type FormEvent,
 } from "react"
 
-import { ReasoningStep, ToolStep } from "@/components/agent-steps"
+import { AgentActivity, type ActivityPart } from "@/components/agent-steps"
 import { AssistantReply } from "@/components/assistant-reply"
 import { ChatSidebar } from "@/components/chat-sidebar"
 import { Button } from "@/components/ui/button"
@@ -79,6 +79,27 @@ function ThemeButton() {
   )
 }
 
+type Segment =
+  | { kind: "text"; text: string }
+  | { kind: "activity"; parts: ActivityPart[] }
+
+function segments(parts: UIMessage["parts"]) {
+  const result: Segment[] = []
+  for (const part of parts) {
+    const last = result.at(-1)
+    if (part.type === "text") {
+      result.push({ kind: "text", text: part.text })
+    } else if (part.type === "reasoning" || part.type === "dynamic-tool") {
+      if (last?.kind === "activity") {
+        last.parts.push(part)
+      } else {
+        result.push({ kind: "activity", parts: [part] })
+      }
+    }
+  }
+  return result
+}
+
 function AssistantParts({
   message,
   streaming,
@@ -86,25 +107,15 @@ function AssistantParts({
   message: UIMessage
   streaming: boolean
 }) {
-  const last = message.parts.length - 1
-  return message.parts.map((part, index) => {
+  const items = segments(message.parts)
+  return items.map((item, index) => {
     const key = `${message.id}-${index}`
-    switch (part.type) {
-      case "text":
-        return (
-          <AssistantReply
-            key={key}
-            text={part.text}
-            streaming={streaming && index === last}
-          />
-        )
-      case "reasoning":
-        return <ReasoningStep key={key} part={part} />
-      case "dynamic-tool":
-        return <ToolStep key={part.toolCallId} part={part} />
-      default:
-        return null
-    }
+    const live = streaming && index === items.length - 1
+    return item.kind === "text" ? (
+      <AssistantReply key={key} text={item.text} streaming={live} />
+    ) : (
+      <AgentActivity key={key} parts={item.parts} working={live} />
+    )
   })
 }
 

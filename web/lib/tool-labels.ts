@@ -10,8 +10,7 @@ const LABELS: Record<string, { running: string; done: string }> = {
 }
 
 function humanize(name: string) {
-  const words = name.replace(/[_-]+/g, " ").trim()
-  return words.charAt(0).toUpperCase() + words.slice(1)
+  return name.replace(/[_-]+/g, " ").trim().toLowerCase()
 }
 
 /** A short phrase for a tool step, in the tense that matches its state. */

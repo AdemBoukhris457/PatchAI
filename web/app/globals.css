@@ -132,9 +132,37 @@
     }
 }
 
+.activity-shimmer {
+  background-image: linear-gradient(
+    90deg,
+    var(--muted-foreground) 35%,
+    var(--foreground) 50%,
+    var(--muted-foreground) 65%
+  );
+  background-size: 250% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  animation: activity-shimmer 2s linear infinite;
+}
+
+@keyframes activity-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: 0% 0;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   [data-slot="spinner"] {
     animation: none;
+  }
+  .activity-shimmer {
+    animation: none;
+    color: var(--foreground);
+    background: none;
   }
 }
 

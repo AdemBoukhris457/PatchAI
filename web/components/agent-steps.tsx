@@ -2,33 +2,87 @@
 
 import type { DynamicToolUIPart, ReasoningUIPart } from "ai"
 import { CheckIcon, ChevronRightIcon, XIcon } from "lucide-react"
+import { useId, useState, type ReactNode } from "react"
 
 import { Spinner } from "@/components/ui/spinner"
 import { toolLabel, toolSummary } from "@/lib/tool-labels"
 import { cn } from "@/lib/utils"
 
-const stepClass =
-  "group rounded-xl border border-border/60 bg-muted/30 text-sm open:bg-muted/40"
-const summaryClass =
-  "flex cursor-pointer list-none items-center gap-2 rounded-xl px-3 py-2 text-muted-foreground outline-none select-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden"
-const chevronClass =
-  "ml-auto size-4 shrink-0 transition-transform group-open:rotate-90"
+export type ActivityPart = DynamicToolUIPart | ReasoningUIPart
 
-function StepIcon({ state }: { state: DynamicToolUIPart["state"] }) {
-  if (state === "output-error" || state === "output-denied") {
-    return <XIcon aria-hidden="true" className="size-4 shrink-0 text-destructive" />
+function failed(part: DynamicToolUIPart) {
+  return part.state === "output-error" || part.state === "output-denied"
+}
+
+function finished(part: DynamicToolUIPart) {
+  return part.state === "output-available" || failed(part)
+}
+
+function busy(part: ActivityPart) {
+  return part.type === "reasoning" ? part.state === "streaming" : !finished(part)
+}
+
+function headline(parts: ActivityPart[], working: boolean) {
+  const tools = parts.filter(
+    (part): part is DynamicToolUIPart => part.type === "dynamic-tool",
+  )
+  if (working) {
+    const current = parts.findLast(busy)
+    if (current?.type === "dynamic-tool") {
+      return toolLabel(current.toolName, false)
+    }
+    return "Thinking"
   }
-  if (state === "output-available") {
-    return <CheckIcon aria-hidden="true" className="size-4 shrink-0" />
+  if (tools.length === 0) {
+    return "Thought it through"
   }
-  return <Spinner aria-hidden="true" className="size-4 shrink-0" />
+  const used = `Used ${tools.length} ${tools.length === 1 ? "tool" : "tools"}`
+  const failures = tools.filter(failed).length
+  return failures > 0 ? `${used}, ${failures} failed` : used
+}
+
+/** Height-animated region that stays out of the tab order while closed. */
+function Reveal({
+  id,
+  open,
+  children,
+}: {
+  id?: string
+  open: boolean
+  children: ReactNode
+}) {
+  return (
+    <div
+      id={id}
+      inert={!open}
+      className={cn(
+        "grid transition-[grid-template-rows,opacity] duration-200 ease-out motion-reduce:transition-none",
+        open ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0",
+      )}
+    >
+      <div className="min-h-0 overflow-hidden">{children}</div>
+    </div>
+  )
+}
+
+function Marker({ part }: { part: ActivityPart }) {
+  if (part.type === "reasoning") {
+    return <span className="size-1.5 rounded-full bg-muted-foreground/60" />
+  }
+  if (failed(part)) {
+    return <XIcon aria-label="Failed" className="size-3.5 text-destructive" />
+  }
+  if (finished(part)) {
+    return <CheckIcon aria-label="Done" className="size-3.5 text-muted-foreground" />
+  }
+  return <Spinner aria-label="Running" className="size-3.5 text-muted-foreground" />
 }
 
 function Detail({ title, children }: { title: string; children: string }) {
   return (
-    <div className="flex flex-col gap-1">
-      <p className="text-xs font-medium text-muted-foreground">{title}</p>
-      <pre className="max-h-64 overflow-auto rounded-lg bg-background p-2 font-mono text-xs leading-5 whitespace-pre-wrap break-words">
+    <div className="flex flex-col gap-1.5">
+      <p className="text-xs text-muted-foreground">{title}</p>
+      <pre className="max-h-60 overflow-auto rounded-lg bg-muted/60 px-3 py-2 font-mono text-xs leading-5 whitespace-pre-wrap break-words text-foreground/90">
         {children}
       </pre>
     </div>
@@ -42,57 +96,133 @@ function asText(value: unknown) {
   return JSON.stringify(value, null, 2) ?? ""
 }
 
-/** One tool call: a compact row that opens to show its input and result. */
-export function ToolStep({ part }: { part: DynamicToolUIPart }) {
-  const finished =
-    part.state === "output-available" ||
-    part.state === "output-error" ||
-    part.state === "output-denied"
+function hasInput(input: unknown) {
+  if (input === undefined || input === null) {
+    return false
+  }
+  return typeof input !== "object" || Object.keys(input).length > 0
+}
+
+function ToolRow({ part }: { part: DynamicToolUIPart }) {
+  const [open, setOpen] = useState(false)
+  const id = useId()
+  const done = finished(part)
   const summary = toolSummary(part.input)
-  const helper = part.toolMetadata?.subagent === true
-  const hasInput =
-    part.input !== undefined &&
-    !(typeof part.input === "object" && part.input !== null && Object.keys(part.input).length === 0)
 
   return (
-    <details className={cn(stepClass, helper && "ml-4")}>
-      <summary className={summaryClass}>
-        <StepIcon state={part.state} />
-        <span className={cn("shrink-0", !finished && "text-foreground")}>
-          {toolLabel(part.toolName, finished)}
+    <div className="flex flex-col">
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls={id}
+        onClick={() => setOpen(!open)}
+        className="group/row flex min-w-0 items-center gap-2 rounded-md py-1 text-left text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        <span
+          className={cn(
+            "shrink-0 transition-colors group-hover/row:text-foreground",
+            done ? "text-muted-foreground" : "text-foreground",
+          )}
+        >
+          {toolLabel(part.toolName, done)}
         </span>
-        {summary ? <span className="min-w-0 truncate">{summary}</span> : null}
-        <ChevronRightIcon aria-hidden="true" className={chevronClass} />
-      </summary>
-      <div className="flex flex-col gap-3 px-3 pb-3">
-        {hasInput ? <Detail title="Input">{asText(part.input)}</Detail> : null}
-        {part.state === "output-available" ? (
-          <Detail title="Result">{asText(part.output)}</Detail>
+        {summary ? (
+          <span className="min-w-0 truncate text-muted-foreground/80">
+            {summary}
+          </span>
         ) : null}
-        {part.state === "output-error" ? (
-          <p className="text-destructive">{part.errorText}</p>
-        ) : null}
-        {!finished ? <p className="text-muted-foreground">Waiting for the result…</p> : null}
-      </div>
-    </details>
+        <ChevronRightIcon
+          aria-hidden="true"
+          className={cn(
+            "size-3.5 shrink-0 text-muted-foreground opacity-0 transition group-hover/row:opacity-100 group-focus-visible/row:opacity-100",
+            open && "rotate-90 opacity-100",
+          )}
+        />
+      </button>
+      <Reveal id={id} open={open}>
+        <div className="flex flex-col gap-3 pt-1 pb-2">
+          {hasInput(part.input) ? (
+            <Detail title="Input">{asText(part.input)}</Detail>
+          ) : null}
+          {part.state === "output-available" ? (
+            <Detail title="Result">{asText(part.output)}</Detail>
+          ) : null}
+          {part.state === "output-error" ? (
+            <p className="text-sm text-destructive">{part.errorText}</p>
+          ) : null}
+          {!done ? (
+            <p className="text-sm text-muted-foreground">Waiting for the result…</p>
+          ) : null}
+        </div>
+      </Reveal>
+    </div>
   )
 }
 
-/** The model's shared reasoning, folded away once it is done. */
-export function ReasoningStep({ part }: { part: ReasoningUIPart }) {
-  const thinking = part.state === "streaming"
+function Step({ part }: { part: ActivityPart }) {
+  const helper =
+    part.type === "dynamic-tool" && part.toolMetadata?.subagent === true
   return (
-    <details className={stepClass} open={thinking || undefined}>
-      <summary className={summaryClass}>
-        {thinking ? <Spinner aria-hidden="true" className="size-4 shrink-0" /> : null}
-        <span className={cn(thinking && "text-foreground")}>
-          {thinking ? "Thinking" : "Thought it through"}
+    <li className={cn("relative pl-5", helper && "ml-4")}>
+      <span className="absolute top-[7px] -left-2 flex size-4 items-center justify-center bg-background">
+        <Marker part={part} />
+      </span>
+      {part.type === "reasoning" ? (
+        <p className="py-1 text-sm leading-6 whitespace-pre-wrap text-muted-foreground">
+          {part.text}
+        </p>
+      ) : (
+        <ToolRow part={part} />
+      )}
+    </li>
+  )
+}
+
+/**
+ * One run of agent work inside a reply. It stays open with a live headline
+ * while the agent works, then folds into a one-line summary.
+ */
+export function AgentActivity({
+  parts,
+  working,
+}: {
+  parts: ActivityPart[]
+  working: boolean
+}) {
+  const [choice, setChoice] = useState<boolean | null>(null)
+  const open = choice ?? working
+  const id = useId()
+
+  return (
+    <div className="flex flex-col">
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls={id}
+        onClick={() => setChoice(!open)}
+        className="group/head flex items-center gap-1 self-start rounded-md py-1 text-sm text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        <span className={cn(working && "activity-shimmer")}>
+          {headline(parts, working)}
         </span>
-        <ChevronRightIcon aria-hidden="true" className={chevronClass} />
-      </summary>
-      <p className="px-3 pb-3 leading-6 whitespace-pre-wrap text-muted-foreground">
-        {part.text}
-      </p>
-    </details>
+        <ChevronRightIcon
+          aria-hidden="true"
+          className={cn(
+            "size-3.5 transition-transform duration-200 motion-reduce:transition-none",
+            open && "rotate-90",
+          )}
+        />
+      </button>
+      <Reveal id={id} open={open}>
+        <ol className="mt-1 ml-2 flex flex-col border-l border-border pb-1">
+          {parts.map((part, index) => (
+            <Step
+              key={part.type === "dynamic-tool" ? part.toolCallId : `reasoning-${index}`}
+              part={part}
+            />
+          ))}
+        </ol>
+      </Reveal>
+    </div>
   )
 }
