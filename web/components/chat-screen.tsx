@@ -1,38 +1,18 @@
 "use client"
 
 import { useChat } from "@ai-sdk/react"
-import { DefaultChatTransport, type UIMessage } from "ai"
-import { ArrowUpIcon } from "lucide-react"
+import {
+  AssistantChatTransport,
+  useAISDKRuntime,
+} from "@assistant-ui/ai-sdk"
+import { AssistantRuntimeProvider } from "@assistant-ui/react"
+import type { UIMessage } from "ai"
 import { useTheme } from "next-themes"
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type FormEvent,
-} from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 
-import { AgentActivity, type ActivityPart } from "@/components/agent-steps"
-import { AssistantReply } from "@/components/assistant-reply"
 import { ChatSidebar } from "@/components/chat-sidebar"
+import { Thread } from "@/components/thread.aui"
 import { Button } from "@/components/ui/button"
-import { Bubble, BubbleContent } from "@/components/ui/bubble"
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupButton,
-  InputGroupTextarea,
-} from "@/components/ui/input-group"
-import { Message, MessageContent } from "@/components/ui/message"
-import {
-  MessageScroller,
-  MessageScrollerButton,
-  MessageScrollerContent,
-  MessageScrollerItem,
-  MessageScrollerProvider,
-  MessageScrollerViewport,
-} from "@/components/ui/message-scroller"
 import {
   SidebarInset,
   SidebarProvider,
@@ -41,7 +21,6 @@ import {
 import {
   createChat,
   loadChats,
-  messageText,
   saveChats,
   titleFrom,
   type StoredChat,
@@ -78,56 +57,6 @@ function ThemeButton() {
   )
 }
 
-type Segment =
-  | { kind: "text"; text: string }
-  | { kind: "activity"; parts: ActivityPart[] }
-
-function segments(parts: UIMessage["parts"]) {
-  const result: Segment[] = []
-  for (const part of parts) {
-    const last = result.at(-1)
-    if (part.type === "text") {
-      result.push({ kind: "text", text: part.text })
-    } else if (part.type === "reasoning" || part.type === "dynamic-tool") {
-      if (last?.kind === "activity") {
-        last.parts.push(part)
-      } else {
-        result.push({ kind: "activity", parts: [part] })
-      }
-    }
-  }
-  return result
-}
-
-function AssistantParts({
-  message,
-  streaming,
-}: {
-  message: UIMessage
-  streaming: boolean
-}) {
-  const items = segments(message.parts)
-  if (items.length === 0 && streaming) {
-    return <AgentActivity parts={[]} working />
-  }
-  const liveActivity = streaming
-    ? items.findLastIndex((item) => item.kind === "activity")
-    : -1
-  return items.map((item, index) => {
-    const key = `${message.id}-${index}`
-    const live = streaming && index === items.length - 1
-    return item.kind === "text" ? (
-      <AssistantReply key={key} text={item.text} streaming={live} />
-    ) : (
-      <AgentActivity
-        key={key}
-        parts={item.parts}
-        working={index === liveActivity}
-      />
-    )
-  })
-}
-
 function ChatThread({
   chatId,
   initialMessages,
@@ -138,183 +67,26 @@ function ChatThread({
   onMessages: (id: string, messages: UIMessage[]) => void
 }) {
   const transport = useMemo(
-    () => new DefaultChatTransport({ api: "/api/chat" }),
+    () => new AssistantChatTransport({ api: "/api/chat" }),
     [],
   )
-  const { messages, sendMessage, status, error, stop } = useChat({
+  const chat = useChat({
     id: chatId,
     messages: initialMessages,
     transport,
   })
-  const [draft, setDraft] = useState("")
-  const [announcement, setAnnouncement] = useState("")
-  const wasBusy = useRef(false)
-  const busy = status === "submitted" || status === "streaming"
-  const canSend = draft.trim().length > 0 && !busy
-  const started = messages.length > 0
+  const runtime = useAISDKRuntime(chat)
 
   useEffect(() => {
-    onMessages(chatId, messages)
-  }, [chatId, messages, onMessages])
-
-  useEffect(() => {
-    if (busy) {
-      wasBusy.current = true
-      return
-    }
-    if (wasBusy.current && status === "ready") {
-      setAnnouncement("Reply ready.")
-      wasBusy.current = false
-    }
-  }, [busy, status])
-
-  async function submitText(raw: string) {
-    const text = raw.trim()
-    if (!text || busy) {
-      return
-    }
-    setDraft("")
-    setAnnouncement("")
-    await sendMessage({ text })
-  }
-
-  async function onSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    const field = event.currentTarget.elements.namedItem("message")
-    const raw = field instanceof HTMLTextAreaElement ? field.value : draft
-    await submitText(raw)
-  }
-
-  const composer = (
-    <form className="flex w-full flex-col gap-2" onSubmit={onSubmit}>
-      <p role="status" className="sr-only">
-        {busy ? "PatchAI is replying." : announcement}
-      </p>
-      {error ? (
-        <p role="alert" className="text-sm text-destructive">
-          {error.message}
-        </p>
-      ) : null}
-      <InputGroup className="rounded-[28px] bg-background px-1.5 py-1">
-        <label htmlFor="message" className="sr-only">
-          Message
-        </label>
-        <InputGroupTextarea
-          id="message"
-          name="message"
-          rows={2}
-          value={draft}
-          placeholder="Ask anything"
-          onChange={(event) => setDraft(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter" && !event.shiftKey) {
-              event.preventDefault()
-              void submitText(event.currentTarget.value)
-            }
-          }}
-        />
-        <InputGroupAddon align="block-end" className="justify-end">
-          {busy ? (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => stop()}
-            >
-              Stop
-            </Button>
-          ) : null}
-          <InputGroupButton
-            type="submit"
-            size="icon-sm"
-            variant="default"
-            disabled={!canSend}
-            aria-label="Send"
-            className="rounded-full"
-          >
-            <ArrowUpIcon />
-          </InputGroupButton>
-        </InputGroupAddon>
-      </InputGroup>
-    </form>
-  )
+    onMessages(chatId, chat.messages)
+  }, [chat.messages, chatId, onMessages])
 
   return (
-    <div
-      className={
-        started
-          ? "flex min-h-0 w-full flex-1 flex-col"
-          : "mx-auto flex w-full max-w-3xl flex-1 flex-col items-center justify-center gap-6 px-4 pb-16"
-      }
-    >
-      {started ? (
-        <MessageScrollerProvider autoScroll>
-          <MessageScroller className="min-h-0 flex-1">
-            <MessageScrollerViewport aria-label="Conversation">
-              <MessageScrollerContent
-                aria-busy={busy}
-                className="mx-auto w-full max-w-3xl gap-8 px-4 py-6"
-              >
-                {messages.map((message, index) => {
-                  const own = message.role === "user"
-                  const streaming =
-                    !own &&
-                    status === "streaming" &&
-                    index === messages.length - 1
-                  return (
-                    <MessageScrollerItem
-                      key={message.id}
-                      messageId={message.id}
-                      scrollAnchor={own}
-                    >
-                      <Message align={own ? "end" : "start"}>
-                        <MessageContent>
-                          <Bubble
-                            variant={own ? "muted" : "ghost"}
-                            align={own ? "end" : "start"}
-                            className={own ? undefined : "w-full"}
-                          >
-                            {own ? (
-                              <BubbleContent className="whitespace-pre-wrap text-base leading-7">
-                                {messageText(message)}
-                              </BubbleContent>
-                            ) : (
-                              <BubbleContent className="flex w-full flex-col gap-3 overflow-visible">
-                                <AssistantParts
-                                  message={message}
-                                  streaming={streaming}
-                                />
-                              </BubbleContent>
-                            )}
-                          </Bubble>
-                        </MessageContent>
-                      </Message>
-                    </MessageScrollerItem>
-                  )
-                })}
-                {status === "submitted" ? (
-                  <MessageScrollerItem key="pending" messageId="pending">
-                    <Message align="start">
-                      <MessageContent>
-                        <AgentActivity parts={[]} working />
-                      </MessageContent>
-                    </Message>
-                  </MessageScrollerItem>
-                ) : null}
-              </MessageScrollerContent>
-            </MessageScrollerViewport>
-            <MessageScrollerButton />
-          </MessageScroller>
-        </MessageScrollerProvider>
-      ) : (
-        <p className="text-center text-2xl tracking-tight">
-          How can I help you today?
-        </p>
-      )}
-      <div className={started ? "mx-auto w-full max-w-3xl px-4 pb-4" : "w-full"}>
-        {composer}
+    <AssistantRuntimeProvider runtime={runtime}>
+      <div className="flex min-h-0 w-full flex-1 flex-col">
+        <Thread />
       </div>
-    </div>
+    </AssistantRuntimeProvider>
   )
 }
 
