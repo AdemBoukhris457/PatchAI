@@ -5,23 +5,13 @@ import {
   ComposerAttachments,
   UserMessageAttachments,
 } from "@/components/attachment.aui";
+import { ChainOfThought } from "@/components/chain-trace";
 import { File, getFileHref } from "@/components/file";
 import { ThreadFollowupSuggestions } from "@/components/follow-up-suggestions.aui";
 import { Image } from "@/components/image";
 import { MarkdownText } from "@/components/markdown-text";
-import {
-  Reasoning,
-  ReasoningContent,
-  ReasoningRoot,
-  ReasoningText,
-  ReasoningTrigger,
-} from "@/components/reasoning.aui";
+import { Reasoning } from "@/components/reasoning.aui";
 import { ToolFallback } from "@/components/tool-fallback.aui";
-import {
-  ToolGroupContent,
-  ToolGroupRoot,
-  ToolGroupTrigger,
-} from "@/components/tool-group.aui";
 import { TooltipIconButton } from "@/components/tooltip-icon-button";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -78,34 +68,8 @@ import {
 
 export type ThreadGroupPart = MessagePrimitive.GroupedParts.GroupPart;
 
-const DefaultToolGroup: FC<PropsWithChildren<{ group: ThreadGroupPart }>> = ({
-  group,
-  children,
-}) => {
-  const [open, setOpen] = useState(false);
-
-  return (
-    <ToolGroupRoot
-      variant="ghost"
-      open={open || group.counts.requiresAction > 0}
-      onOpenChange={setOpen}
-    >
-      <ToolGroupTrigger
-        count={group.indices.length}
-        active={group.status.type === "running"}
-      />
-      <ToolGroupContent>{children}</ToolGroupContent>
-    </ToolGroupRoot>
-  );
-};
-
 const shouldShowComposerResume = (s: AssistantState) =>
   !!s.thread.canResume && s.composer.type === "thread" && s.composer.isEmpty;
-
-const reasoningDuration = (timing: ThreadGroupPart["timing"]) =>
-  timing?.completedAt === undefined
-    ? undefined
-    : Math.round((timing.completedAt - timing.startedAt) / 1000);
 
 /**
  * Optional component overrides for the thread. `AssistantMessage` and
@@ -604,11 +568,13 @@ const AssistantMessage: FC = () => {
         data-slot="aui_assistant-message-content"
         className="text-foreground px-2 leading-relaxed wrap-break-word"
       >
-        <MessagePrimitive.GroupedParts groupBy={groupBy}>
+        <MessagePrimitive.GroupedParts groupBy={groupBy} indicator="empty">
           {({ part, children }) => {
             switch (part.type) {
               case "group-chainOfThought":
-                return <div data-slot="aui_chain-of-thought">{children}</div>;
+                return (
+                  <ChainOfThought group={part}>{children}</ChainOfThought>
+                );
               case "group-task":
                 return TaskGroupComponent ? (
                   <TaskGroupComponent group={part} />
@@ -617,26 +583,17 @@ const AssistantMessage: FC = () => {
                 if (ToolGroup) {
                   return <ToolGroup group={part}>{children}</ToolGroup>;
                 }
-                return (
-                  <DefaultToolGroup group={part}>{children}</DefaultToolGroup>
-                );
+                return <div className="flex flex-col">{children}</div>;
               case "group-reasoning": {
                 if (ReasoningGroup) {
                   return (
                     <ReasoningGroup group={part}>{children}</ReasoningGroup>
                   );
                 }
-                const running = part.status.type === "running";
                 return (
-                  <ReasoningRoot streaming={running}>
-                    <ReasoningTrigger
-                      active={running}
-                      duration={reasoningDuration(part.timing)}
-                    />
-                    <ReasoningContent aria-busy={running}>
-                      <ReasoningText>{children}</ReasoningText>
-                    </ReasoningContent>
-                  </ReasoningRoot>
+                  <div className="text-muted-foreground max-h-64 overflow-y-auto text-sm leading-relaxed">
+                    {children}
+                  </div>
                 );
               }
               case "text":
@@ -661,13 +618,19 @@ const AssistantMessage: FC = () => {
                 );
               case "indicator":
                 return (
-                  <span
+                  <p
                     data-slot="aui_assistant-message-indicator"
-                    className="animate-pulse font-sans"
-                    aria-label="Assistant is working"
+                    role="status"
+                    className="text-muted-foreground flex items-center gap-2 text-sm"
                   >
-                    {"●"}
-                  </span>
+                    <span
+                      className="bg-foreground/70 size-1.5 animate-pulse rounded-full motion-reduce:animate-none"
+                      aria-hidden
+                    />
+                    <span className="shimmer motion-reduce:animate-none">
+                      Working
+                    </span>
+                  </p>
                 );
               default:
                 return null;

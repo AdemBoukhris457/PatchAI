@@ -30,6 +30,7 @@ import {
   type ToolCallMessagePartStatus,
   type ToolCallMessagePartComponent,
 } from "@assistant-ui/react";
+import { toolPhrase } from "@/lib/tool-labels";
 import { cn } from "@/lib/utils";
 import {
   CollapsibleRoot as Collapsible,
@@ -162,13 +163,18 @@ function ToolFallbackTrigger({
   const label =
     responseDeliveryStatus === "queued"
       ? "Reply queued, not sent yet"
-      : statusType === "running"
-        ? "Running tool"
-        : statusType === "requires-action"
-          ? "Waiting on tool"
-          : statusType === "incomplete"
-            ? `${isCancelled ? "Cancelled" : "Failed"} tool`
-            : "Used tool";
+      : toolPhrase(
+          toolName,
+          statusType === "running"
+            ? "running"
+            : statusType === "requires-action"
+              ? "waiting"
+              : statusType === "incomplete"
+                ? isCancelled
+                  ? "cancelled"
+                  : "failed"
+                : "done",
+        );
 
   return (
     <CollapsibleTrigger
@@ -195,7 +201,7 @@ function ToolFallbackTrigger({
           isRunning && "shimmer motion-reduce:animate-none",
         )}
       >
-        {label}: <b>{toolName}</b>
+        {label}
       </span>
       <ToolFallbackDuration />
       <ChevronDownIcon

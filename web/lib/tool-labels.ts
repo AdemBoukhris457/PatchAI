@@ -13,6 +13,18 @@ function humanize(name: string) {
   return name.replace(/[_-]+/g, " ").trim().toLowerCase()
 }
 
+export function toolPhrase(
+  name: string,
+  state: "running" | "done" | "waiting" | "failed" | "cancelled",
+) {
+  if (state === "running") return toolLabel(name, false)
+  if (state === "done") return toolLabel(name, true)
+  const plain = humanize(name)
+  if (state === "waiting") return `Waiting on ${plain}`
+  if (state === "cancelled") return `Stopped checking ${plain}`
+  return `Couldn't check ${plain}`
+}
+
 /** A short phrase for a tool step, in the tense that matches its state. */
 export function toolLabel(name: string, finished: boolean) {
   const known = LABELS[name]
@@ -24,6 +36,14 @@ export function toolLabel(name: string, finished: boolean) {
 
 function lowerFirst(value: string) {
   return value.charAt(0).toLowerCase() + value.slice(1)
+}
+
+function withoutSharedVerb(label: string, verb: string) {
+  const prefix = `${verb} `
+  if (label.toLowerCase().startsWith(prefix.toLowerCase())) {
+    return label.slice(prefix.length)
+  }
+  return lowerFirst(label)
 }
 
 function repeated(label: string, count: number) {
@@ -47,13 +67,14 @@ export function workSummary(labels: string[]) {
   if (labels.every((label) => label === labels[0])) {
     return repeated(labels[0], labels.length)
   }
+  const verb = labels[0].split(" ")[0] ?? ""
   if (labels.length === 2) {
-    return `${labels[0]} and ${lowerFirst(labels[1])}`
+    return `${labels[0]} and ${withoutSharedVerb(labels[1], verb)}`
   }
   if (labels.length === 3) {
-    return `${labels[0]}, ${lowerFirst(labels[1])}, and ${lowerFirst(labels[2])}`
+    return `${labels[0]}, ${withoutSharedVerb(labels[1], verb)}, and ${withoutSharedVerb(labels[2], verb)}`
   }
-  return `${labels[0]}, ${lowerFirst(labels[1])}, and ${labels.length - 2} more`
+  return `${labels[0]}, ${withoutSharedVerb(labels[1], verb)}, and ${labels.length - 2} more`
 }
 
 /** The first few plain values of a tool's input, such as a ticker or a state. */
