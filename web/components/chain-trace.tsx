@@ -16,6 +16,7 @@ const FOLD_MS = 250
 
 type TraceGroup = {
   indices: readonly number[]
+  status: { type: string }
 }
 
 function headingFrom(text: string) {
@@ -181,18 +182,7 @@ export function ChainOfThought({
   const done = useAuiState((state) =>
     doneLabel(group.indices.map((index) => state.message.parts[index])),
   )
-  const working = useAuiState((state) => {
-    if (state.message.status?.type !== "running") return false
-    let last = -1
-    for (let index = state.message.parts.length - 1; index >= 0; index -= 1) {
-      const type = state.message.parts[index]?.type
-      if (type === "reasoning" || type === "tool-call") {
-        last = index
-        break
-      }
-    }
-    return group.indices.includes(last)
-  })
+  const working = group.status.type === "running"
   const [open, setOpen] = useState(working)
   const [seenWorking, setSeenWorking] = useState(working)
   const [seconds, setSeconds] = useState<number | null>(null)
