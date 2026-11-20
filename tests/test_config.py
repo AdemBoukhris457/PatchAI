@@ -79,6 +79,36 @@ def test_missing_table_is_rejected(tmp_path: Path) -> None:
         load_settings(path)
 
 
+def test_model_options_are_read_per_provider(tmp_path: Path) -> None:
+    path = tmp_path / "config.toml"
+    path.write_text(
+        '[channel]\nactive = "cli"\n'
+        '[model]\nname = "openai:gpt-6-luna"\n'
+        '[model.options.openai]\nreasoning = { summary = "auto" }\n'
+        "[plugins]\nenabled = []\n"
+        '[mcp]\nconfig = "mcp.json"\n',
+        encoding="utf-8",
+    )
+
+    settings = load_settings(path)
+
+    assert settings.model_options == {"openai": {"reasoning": {"summary": "auto"}}}
+
+
+def test_model_options_must_be_tables(tmp_path: Path) -> None:
+    path = tmp_path / "config.toml"
+    path.write_text(
+        '[channel]\nactive = "cli"\n'
+        '[model]\nname = "openai:gpt-6-luna"\noptions = { openai = "fast" }\n'
+        "[plugins]\nenabled = []\n"
+        '[mcp]\nconfig = "mcp.json"\n',
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match=r"\[model.options\]"):
+        load_settings(path)
+
+
 def test_mcp_servers_must_be_an_object(tmp_path: Path) -> None:
     path = tmp_path / "mcp.json"
     path.write_text('{"mcpServers": ["not-an-object"]}\n', encoding="utf-8")

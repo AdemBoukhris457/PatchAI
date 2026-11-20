@@ -28,6 +28,7 @@ def load_settings(path: Path) -> Settings:
         model=_string(model, "model", "name"),
         plugins=tuple(enabled),
         mcp_config=_string(mcp, "mcp", "config"),
+        model_options=_model_options(model),
     )
 
 
@@ -37,6 +38,18 @@ def apply_model_choice(settings: Settings) -> Settings:
     if not chosen:
         return settings
     return replace(settings, model=chosen)
+
+
+def _model_options(model: dict[str, object]) -> dict[str, dict[str, object]]:
+    options = model.get("options", {})
+    if not isinstance(options, dict) or not all(
+        isinstance(value, dict) for value in options.values()
+    ):
+        raise ValueError(
+            "config.toml [model.options] must hold one table per provider, "
+            "such as [model.options.openai]."
+        )
+    return options
 
 
 def _table(data: dict[str, object], name: str) -> dict[str, object]:

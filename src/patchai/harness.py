@@ -12,6 +12,7 @@ from pathlib import Path
 
 from deepagents import FilesystemPermission, create_deep_agent
 from deepagents.backends import CompositeBackend, FilesystemBackend, StateBackend, StoreBackend
+from langchain.chat_models import init_chat_model
 from langchain_core.language_models import BaseChatModel
 from langchain_core.tools import BaseTool
 from langgraph.checkpoint.memory import InMemorySaver
@@ -54,6 +55,20 @@ def project_backend(root: Path, store: InMemoryStore) -> CompositeBackend:
     )
 
 
+def chat_model(settings: Settings) -> str | BaseChatModel:
+    """The model for ``settings``, with options for its provider applied.
+
+    Without options the ``provider:model`` string goes to Deep Agents as is,
+    so its provider defaults still apply. Options replace those defaults,
+    so they must repeat any that still matter.
+    """
+    provider = settings.model.partition(":")[0]
+    options = settings.model_options.get(provider)
+    if not options:
+        return settings.model
+    return init_chat_model(settings.model, **options)
+
+
 def build_agent(
     settings: Settings,
     *,
@@ -68,7 +83,7 @@ def build_agent(
     ``config.toml`` is read from.
 
     Pass ``model`` to supply an already constructed chat model. Otherwise the
-    ``provider:model`` string in ``settings`` is resolved by Deep Agents.
+    model comes from ``settings``; see ``chat_model``.
 
     ``mcp_tools`` are the tools already loaded from the MCP servers.
     """
@@ -77,7 +92,7 @@ def build_agent(
     tools = [tool for plugin in load_enabled(settings.plugins) for tool in plugin.tools()]
     tools.extend(mcp_tools)
     return create_deep_agent(
-        model=model if model is not None else settings.model,
+        model=model if model is not None else chat_model(settings),
         tools=tools,
         system_prompt=SYSTEM_PROMPT,
         memory=["/memory/AGENTS.md"],
