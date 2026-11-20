@@ -35,6 +35,7 @@ import {
   type ImageMessagePartComponent,
   type TextMessagePartComponent,
   type ToolCallMessagePartComponent,
+  unstable_useMessageStallDetection,
   useAuiState,
 } from "@assistant-ui/react";
 import {
@@ -61,6 +62,7 @@ import {
 import {
   createContext,
   useContext,
+  useEffect,
   useLayoutEffect,
   useRef,
   useState,
@@ -556,6 +558,39 @@ const answerMotion = {
   easing: "ease-out",
 };
 
+const ThinkingLine: FC = () => {
+  const [seconds, setSeconds] = useState(0);
+
+  useEffect(() => {
+    const start = Date.now();
+    const id = window.setInterval(() => {
+      setSeconds(Math.floor((Date.now() - start) / 1000));
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  const label = seconds > 0 ? `Working · ${seconds}s` : "Working";
+
+  return (
+    <p
+      data-slot="aui_assistant-message-indicator"
+      role="status"
+      className="text-muted-foreground flex items-center gap-2 py-1 text-sm"
+    >
+      <span
+        className="bg-foreground/70 size-1.5 shrink-0 animate-pulse rounded-full motion-reduce:animate-none"
+        aria-hidden
+      />
+      <span
+        key={label}
+        className="shimmer animate-in fade-in duration-200 motion-reduce:animate-none"
+      >
+        {label}
+      </span>
+    </p>
+  );
+};
+
 const AnswerText: FC = () => {
   const running = useAuiState((state) => state.part.status.type === "running");
   return (
@@ -577,6 +612,17 @@ const AssistantMessage: FC = () => {
     TaskGroup: TaskGroupComponent,
   } = useContext(ThreadComponentsContext);
   const groupBy = TaskGroupComponent ? taskAwareGroupBy : messageGroupBy;
+  const traceRunning = useAuiState((state) =>
+    state.message.parts.some(
+      (part) =>
+        (part.type === "reasoning" || part.type === "tool-call") &&
+        part.status.type === "running",
+    ),
+  );
+  const awaitingFirstPart = useAuiState(
+    (state) => state.message.parts.length === 0,
+  );
+  const { stalled } = unstable_useMessageStallDetection();
 
   const ACTION_BAR_PT = "pt-1.5";
   // Keep the action bar inside the contained root's paint box, then cancel its reserved space in flow.
@@ -641,26 +687,13 @@ const AssistantMessage: FC = () => {
                   </div>
                 );
               case "indicator":
-                return (
-                  <p
-                    data-slot="aui_assistant-message-indicator"
-                    role="status"
-                    className="text-muted-foreground flex items-center gap-2 text-sm"
-                  >
-                    <span
-                      className="bg-foreground/70 size-1.5 animate-pulse rounded-full motion-reduce:animate-none"
-                      aria-hidden
-                    />
-                    <span className="shimmer motion-reduce:animate-none">
-                      Working
-                    </span>
-                  </p>
-                );
+                return <ThinkingLine />;
               default:
                 return null;
             }
           }}
         </MessagePrimitive.GroupedParts>
+        {stalled && !awaitingFirstPart && !traceRunning ? <ThinkingLine /> : null}
         <MessageError />
       </div>
 
