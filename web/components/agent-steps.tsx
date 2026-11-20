@@ -196,11 +196,15 @@ function Step({ part }: { part: ActivityPart }) {
 }
 
 function StatusText({ label, shimmer }: { label: string | null; shimmer: boolean }) {
-  return (
-    <span aria-hidden={label === null} className={cn(shimmer && "activity-shimmer")}>
-      {label ?? "···"}
-    </span>
-  )
+  if (label === null) {
+    return (
+      <span className="inline-flex items-center gap-2">
+        <span aria-hidden="true" className="activity-pulse size-1.5 rounded-full bg-current" />
+        <span className={cn(shimmer && "activity-shimmer")}>Working</span>
+      </span>
+    )
+  }
+  return <span className={cn(shimmer && "activity-shimmer")}>{label}</span>
 }
 
 /**
@@ -230,10 +234,7 @@ export function AgentActivity({
 
   if (parts.length === 0) {
     return (
-      <p
-        aria-label={label === null ? "Working" : undefined}
-        className="self-start py-1 text-sm text-muted-foreground"
-      >
+      <p className="self-start py-1 text-sm text-muted-foreground">
         <StatusText label={label} shimmer={working} />
       </p>
     )
@@ -245,7 +246,6 @@ export function AgentActivity({
         type="button"
         aria-expanded={open}
         aria-controls={id}
-        aria-label={label === null ? "Working" : undefined}
         onClick={() => setChoice(!open)}
         className="group/head flex items-center gap-1 self-start rounded-md py-1 text-sm text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
       >
