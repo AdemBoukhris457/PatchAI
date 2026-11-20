@@ -72,6 +72,94 @@ function doneLabel(parts: readonly (PartState | undefined)[]) {
   return parts.some((part) => part?.type === "reasoning") ? "Thought" : "Worked"
 }
 
+function ReasoningFade({ side }: { side: "top" | "bottom" }) {
+  return (
+    <div
+      aria-hidden
+      className={cn(
+        "pointer-events-none absolute inset-x-0 z-10 h-8",
+        side === "top"
+          ? "top-0 bg-[linear-gradient(to_bottom,var(--color-background),transparent)]"
+          : "bottom-0 bg-[linear-gradient(to_top,var(--color-background),transparent)]",
+      )}
+    />
+  )
+}
+
+export function ReasoningTrace({
+  streaming,
+  children,
+}: {
+  streaming: boolean
+  children: ReactNode
+}) {
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const contentRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!streaming) return
+    const scrollEl = scrollRef.current
+    const contentEl = contentRef.current
+    if (!scrollEl || !contentEl) return
+
+    let pinned = true
+    let lastScrollTop = scrollEl.scrollTop
+    let lastScrollHeight = scrollEl.scrollHeight
+    const atBottom = () =>
+      Math.abs(
+        scrollEl.scrollHeight - scrollEl.scrollTop - scrollEl.clientHeight,
+      ) <= 1 || scrollEl.scrollHeight <= scrollEl.clientHeight
+    const pin = () => {
+      if (!pinned) return
+      scrollEl.scrollTop = scrollEl.scrollHeight
+    }
+    const onScroll = () => {
+      if (atBottom()) {
+        pinned = true
+      } else if (
+        scrollEl.scrollTop < lastScrollTop &&
+        scrollEl.scrollHeight === lastScrollHeight
+      ) {
+        pinned = false
+      }
+      lastScrollTop = scrollEl.scrollTop
+      lastScrollHeight = scrollEl.scrollHeight
+    }
+
+    pin()
+    scrollEl.addEventListener("scroll", onScroll)
+    const observer = new ResizeObserver(pin)
+    observer.observe(contentEl)
+    return () => {
+      scrollEl.removeEventListener("scroll", onScroll)
+      observer.disconnect()
+    }
+  }, [streaming])
+
+  if (!streaming) {
+    return (
+      <div className="text-muted-foreground flex flex-col gap-3 text-sm leading-relaxed">
+        {children}
+      </div>
+    )
+  }
+
+  return (
+    <div className="relative">
+      <ReasoningFade side="top" />
+      <div
+        ref={scrollRef}
+        className="text-muted-foreground max-h-64 overflow-y-auto text-sm leading-relaxed [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
+        <div ref={contentRef} className="flex flex-col gap-3 py-2">
+          {children}
+        </div>
+      </div>
+      <ReasoningFade side="bottom" />
+    </div>
+  )
+}
+
 function finishedLine(done: string, seconds: number | null) {
   const parts = [
     seconds === null ? null : `Worked for ${seconds}s`,

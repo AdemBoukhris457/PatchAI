@@ -5,7 +5,7 @@ import {
   ComposerAttachments,
   UserMessageAttachments,
 } from "@/components/attachment.aui";
-import { ChainOfThought } from "@/components/chain-trace";
+import { ChainOfThought, ReasoningTrace } from "@/components/chain-trace";
 import { File, getFileHref } from "@/components/file";
 import { ThreadFollowupSuggestions } from "@/components/follow-up-suggestions.aui";
 import { Image } from "@/components/image";
@@ -203,7 +203,7 @@ const ThreadRoot: FC<{ isEmpty: boolean; autoFocus: boolean }> = ({
       <ThreadPrimitive.Viewport
         turnAnchor="top"
         data-slot="aui_thread-viewport"
-        className="relative flex flex-1 flex-col overflow-x-auto overflow-y-scroll scroll-smooth"
+        className="relative flex flex-1 flex-col overflow-x-auto overflow-y-auto scroll-smooth"
       >
         <div
           className={cn(
@@ -591,9 +591,9 @@ const AssistantMessage: FC = () => {
                   );
                 }
                 return (
-                  <div className="text-muted-foreground max-h-64 overflow-y-auto text-sm leading-relaxed">
+                  <ReasoningTrace streaming={part.status.type === "running"}>
                     {children}
-                  </div>
+                  </ReasoningTrace>
                 );
               }
               case "text":
