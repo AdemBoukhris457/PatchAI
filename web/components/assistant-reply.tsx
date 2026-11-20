@@ -27,7 +27,6 @@ export const AssistantReply = memo(function AssistantReply({
       className="text-base leading-7 [&>*:first-child]:mt-0 [&>*:last-child]:mb-0"
       plugins={plugins}
       animated={streaming ? streamMotion : false}
-      caret={streaming ? "circle" : undefined}
       isAnimating={streaming}
     >
       {normalizeMath(text)}

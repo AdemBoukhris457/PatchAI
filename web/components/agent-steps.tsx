@@ -2,16 +2,10 @@
 
 import type { DynamicToolUIPart, ReasoningUIPart } from "ai"
 import { CheckIcon, ChevronRightIcon, XIcon } from "lucide-react"
-import { useId, useState, type ReactNode } from "react"
+import { useEffect, useId, useState, type ReactNode } from "react"
 import { Streamdown } from "streamdown"
 
 import { Spinner } from "@/components/ui/spinner"
-
-const streamMotion = {
-  animation: "blurIn" as const,
-  duration: 250,
-  easing: "ease-out",
-}
 import { toolLabel, toolSummary } from "@/lib/tool-labels"
 import { cn } from "@/lib/utils"
 
@@ -35,7 +29,8 @@ function latestHeading(text: string) {
   return headings.at(-1)?.[1].trim()
 }
 
-function headline(parts: ActivityPart[], working: boolean) {
+/** Visible status. ``null`` means the run has not named an action yet. */
+function headline(parts: ActivityPart[], working: boolean, seconds: number | null) {
   const tools = parts.filter(
     (part): part is DynamicToolUIPart => part.type === "dynamic-tool",
   )
@@ -45,12 +40,12 @@ function headline(parts: ActivityPart[], working: boolean) {
       return toolLabel(current.toolName, false)
     }
     if (current?.type === "reasoning") {
-      return latestHeading(current.text) ?? "Thinking"
+      return latestHeading(current.text) ?? null
     }
-    return "Thinking"
+    return null
   }
   if (tools.length === 0) {
-    return "Thought it through"
+    return seconds === null ? "Thought it through" : `Thought for ${seconds}s`
   }
   const used = `Used ${tools.length} ${tools.length === 1 ? "tool" : "tools"}`
   const failures = tools.filter(failed).length
@@ -189,8 +184,6 @@ function Step({ part }: { part: ActivityPart }) {
       {part.type === "reasoning" ? (
         <Streamdown
           className="py-1 text-sm leading-6 text-muted-foreground [&_strong]:font-medium [&_strong]:text-foreground/80 [&>*]:my-1.5 [&>*:first-child]:mt-0 [&>*:last-child]:mb-0"
-          animated={part.state === "streaming" ? streamMotion : false}
-          caret={part.state === "streaming" ? "circle" : undefined}
           isAnimating={part.state === "streaming"}
         >
           {part.text}
@@ -199,6 +192,14 @@ function Step({ part }: { part: ActivityPart }) {
         <ToolRow part={part} />
       )}
     </li>
+  )
+}
+
+function StatusText({ label, shimmer }: { label: string | null; shimmer: boolean }) {
+  return (
+    <span aria-hidden={label === null} className={cn(shimmer && "activity-shimmer")}>
+      {label ?? "···"}
+    </span>
   )
 }
 
@@ -214,15 +215,26 @@ export function AgentActivity({
   working: boolean
 }) {
   const [choice, setChoice] = useState<boolean | null>(null)
+  const [seconds, setSeconds] = useState<number | null>(null)
+  useEffect(() => {
+    if (!working) return
+    const start = Date.now()
+    return () => {
+      const elapsed = Math.max(1, Math.round((Date.now() - start) / 1000))
+      setSeconds(elapsed)
+    }
+  }, [working])
   const open = choice ?? working
   const id = useId()
+  const label = headline(parts, working, seconds)
 
   if (parts.length === 0) {
     return (
-      <p className="self-start py-1 text-sm text-muted-foreground">
-        <span className={cn(working && "activity-shimmer")}>
-          {headline(parts, working)}
-        </span>
+      <p
+        aria-label={label === null ? "Working" : undefined}
+        className="self-start py-1 text-sm text-muted-foreground"
+      >
+        <StatusText label={label} shimmer={working} />
       </p>
     )
   }
@@ -233,12 +245,11 @@ export function AgentActivity({
         type="button"
         aria-expanded={open}
         aria-controls={id}
+        aria-label={label === null ? "Working" : undefined}
         onClick={() => setChoice(!open)}
         className="group/head flex items-center gap-1 self-start rounded-md py-1 text-sm text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
       >
-        <span className={cn(working && "activity-shimmer")}>
-          {headline(parts, working)}
-        </span>
+        <StatusText label={label} shimmer={working} />
         <ChevronRightIcon
           aria-hidden="true"
           className={cn(
