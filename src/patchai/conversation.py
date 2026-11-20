@@ -86,11 +86,13 @@ async def ask(agent: Any, thread_id: str, text: str) -> str:
 
 async def stream_events(agent: Any, thread_id: str, text: str) -> AsyncIterator[Event]:
     """Yield text, reasoning and tool progress for one turn."""
+    config = {"configurable": {"thread_id": thread_id}}
+    earlier = await _earlier_calls(agent, config)
     open_calls: dict[tuple[tuple[str, ...], int], str] = {}
     announced: set[str] = set()
     async for chunk in agent.astream(
         {"messages": [{"role": "user", "content": text}]},
-        {"configurable": {"thread_id": thread_id}},
+        config,
         stream_mode=["messages", "updates"],
         subgraphs=True,
         version="v2",
@@ -105,10 +107,37 @@ async def stream_events(agent: Any, thread_id: str, text: str) -> AsyncIterator[
                 yield event
         elif chunk.get("type") == "updates":
             for event in _update_events(chunk.get("data"), subagent):
+                if event.call_id in earlier:
+                    continue
                 if isinstance(event, ToolCalled) and event.call_id not in announced:
                     announced.add(event.call_id)
                     yield ToolStarted(event.call_id, event.name, subagent)
                 yield event
+
+
+async def _earlier_calls(agent: Any, config: dict[str, Any]) -> set[str]:
+    """Tool call ids already in the thread.
+
+    Middleware may write the whole history back as an update at the start of
+    a turn, so those calls would otherwise be reported again.
+    """
+    if getattr(agent, "checkpointer", None) is None:
+        return set()
+    snapshot = await agent.aget_state(config)
+    messages = (snapshot.values or {}).get("messages") or []
+    return {
+        call_id
+        for message in messages
+        for call_id in _call_ids(message)
+    }
+
+
+def _call_ids(message: object) -> Iterable[str]:
+    if isinstance(message, AIMessage):
+        return [call["id"] for call in message.tool_calls if call.get("id")]
+    if isinstance(message, ToolMessage):
+        return [message.tool_call_id]
+    return []
 
 
 def _token_events(
@@ -140,7 +169,7 @@ def _token_events(
             yield ReasoningDelta(block["reasoning"])
 
 
-def _update_events(data: object, subagent: bool) -> Iterable[Event]:
+def _update_events(data: object, subagent: bool) -> Iterable[ToolCalled | ToolFinished]:
     if not isinstance(data, dict):
         return
     for update in data.values():

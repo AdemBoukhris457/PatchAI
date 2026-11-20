@@ -106,6 +106,22 @@ async def test_ask_returns_only_the_answer_text() -> None:
     assert await ask(agent, "thread", "what time is it") == "It is noon. "
 
 
+@pytest.mark.asyncio
+async def test_a_later_turn_reports_only_its_own_tool_calls() -> None:
+    agent = _agent(
+        AIMessage(content="", tool_calls=[{"name": "current_time", "args": {}, "id": "call_1"}]),
+        AIMessage(content="It is noon."),
+        AIMessage(content="", tool_calls=[{"name": "current_time", "args": {}, "id": "call_2"}]),
+        AIMessage(content="Still noon."),
+    )
+    await ask(agent, "thread", "what time is it")
+
+    events = [event async for event in stream_events(agent, "thread", "and now?")]
+
+    call_ids = {event.call_id for event in events if hasattr(event, "call_id")}
+    assert call_ids == {"call_2"}
+
+
 def test_reasoning_blocks_become_reasoning_events() -> None:
     token = AIMessageChunk(
         content=[{"type": "reasoning", "reasoning": "think"}, {"type": "text", "text": "hi"}]
