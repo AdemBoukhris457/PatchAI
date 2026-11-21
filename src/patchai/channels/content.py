@@ -45,6 +45,32 @@ class TurnError(ValueError):
     """The payload is not a usable user turn."""
 
 
+def parse_prior(payload: dict[str, object]) -> list[tuple[str, str]] | None:
+    """Return the dialogue the page kept, or ``None`` when the body omits it.
+
+    Each entry is ``("user", text)`` or ``("assistant", text)``. An omitted
+    key means the caller is appending to the thread head. An empty list means
+    the page kept nothing before this turn.
+    """
+    if "prior" not in payload:
+        return None
+    raw = payload["prior"]
+    if not isinstance(raw, list):
+        raise TurnError("The message could not be read.")
+    lines: list[tuple[str, str]] = []
+    for item in raw:
+        if not isinstance(item, dict):
+            raise TurnError("The message could not be read.")
+        role = item.get("role")
+        text = item.get("text")
+        if role not in ("user", "assistant") or not isinstance(text, str):
+            raise TurnError("The message could not be read.")
+        stripped = text.strip()
+        if stripped:
+            lines.append((role, stripped))
+    return lines
+
+
 def parse_turn(payload: dict[str, object]) -> UserContent:
     """Return the user message carried by one ``POST /chat`` body."""
     if "content" in payload:

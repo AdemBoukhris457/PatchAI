@@ -14,11 +14,14 @@ from collections.abc import AsyncIterator, Awaitable, Callable, Coroutine
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from patchai.channels import ui_stream
-from patchai.channels.content import TurnError, UserContent, parse_turn
+from patchai.channels.content import TurnError, UserContent, parse_prior, parse_turn
 from patchai.channels.registry import register
 from patchai.conversation import Event
 
-ReplyHandler = Callable[[str, str, UserContent], Awaitable[str] | AsyncIterator[Event]]
+ReplyHandler = Callable[
+    [str, str, UserContent, list[tuple[str, str]] | None],
+    Awaitable[str] | AsyncIterator[Event],
+]
 
 _MAX_BODY = 32_000_000
 
@@ -137,10 +140,11 @@ def _chat_handler(
                 return
             try:
                 content = parse_turn(payload)
+                prior = parse_prior(payload)
             except TurnError as exc:
                 _plain(self, 400, str(exc))
                 return
-            result = handler(thread_id.strip(), "local", content)
+            result = handler(thread_id.strip(), "local", content, prior)
             if hasattr(result, "__aiter__"):
                 _stream(self, loop, result)
                 return

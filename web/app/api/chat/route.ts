@@ -10,15 +10,38 @@ type Incoming = {
   messages?: IncomingMessage[]
 }
 
+function lastUserIndex(messages: IncomingMessage[]) {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    if (messages[index]?.role === "user") return index
+  }
+  return -1
+}
+
+function textOf(message: IncomingMessage) {
+  return (message.parts ?? [])
+    .filter((part) => part.type === "text" && typeof part.text === "string")
+    .map((part) => part.text ?? "")
+    .join("")
+    .trim()
+}
+
 function lastUserParts(body: Incoming) {
   const messages = body.messages ?? []
-  for (let index = messages.length - 1; index >= 0; index -= 1) {
-    const message = messages[index]
-    if (message?.role === "user") {
-      return message.parts ?? []
+  const index = lastUserIndex(messages)
+  return index < 0 ? [] : (messages[index]?.parts ?? [])
+}
+
+function priorLines(body: Incoming) {
+  const messages = body.messages ?? []
+  const index = lastUserIndex(messages)
+  const kept = index < 0 ? [] : messages.slice(0, index)
+  return kept.flatMap((message) => {
+    if (!message || (message.role !== "user" && message.role !== "assistant")) {
+      return []
     }
-  }
-  return []
+    const text = textOf(message)
+    return text ? [{ role: message.role, text }] : []
+  })
 }
 
 export async function POST(request: Request) {
@@ -41,7 +64,11 @@ export async function POST(request: Request) {
     const upstream = await fetch(agentUrl, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ thread_id: threadId, ...turn.body }),
+      body: JSON.stringify({
+        thread_id: threadId,
+        prior: priorLines(body),
+        ...turn.body,
+      }),
     })
     if (!upstream.ok || upstream.body === null) {
       const reply = await upstream.text()

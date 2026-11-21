@@ -2,7 +2,22 @@
 
 import pytest
 
-from patchai.channels.content import TurnError, parse_turn
+from patchai.channels.content import TurnError, parse_prior, parse_turn
+
+
+def test_prior_keeps_the_dialogue_the_page_still_shows() -> None:
+    assert parse_prior({"text": "hello"}) is None
+    assert parse_prior({"text": "hello", "prior": []}) == []
+    assert parse_prior(
+        {
+            "text": "Ana",
+            "prior": [
+                {"role": "user", "text": " Bob "},
+                {"role": "assistant", "text": "Hi Bob."},
+                {"role": "assistant", "text": "   "},
+            ],
+        }
+    ) == [("user", "Bob"), ("assistant", "Hi Bob.")]
 
 
 def test_plain_text_stays_a_string() -> None:

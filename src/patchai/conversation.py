@@ -12,13 +12,14 @@ calls and the tools' results. Both are turned into the channel-neutral
 events below, so a channel can show progress without knowing LangGraph.
 """
 
-from collections.abc import AsyncIterator, Iterable
+from collections.abc import AsyncIterator, Iterable, Sequence
 from dataclasses import dataclass
 from typing import Any
 
 from patchai.channels.content import UserContent
 
-from langchain_core.messages import AIMessage, AIMessageChunk, ToolMessage
+from langchain_core.messages import AIMessage, AIMessageChunk, RemoveMessage, ToolMessage
+from langgraph.graph.message import REMOVE_ALL_MESSAGES
 
 _MAX_OUTPUT = 4000
 
@@ -75,24 +76,40 @@ class ToolFinished:
 
 Event = TextDelta | ReasoningDelta | ToolStarted | ToolInputDelta | ToolCalled | ToolFinished
 
+# One line of the conversation the page still shows, before the new turn.
+PriorLine = tuple[str, str]
 
-async def ask(agent: Any, thread_id: str, content: UserContent) -> str:
+
+async def ask(
+    agent: Any,
+    thread_id: str,
+    content: UserContent,
+    prior: Sequence[PriorLine] | None = None,
+) -> str:
     """Append ``content`` to ``thread_id`` and return the assistant's text."""
     parts = [
         event.text
-        async for event in stream_events(agent, thread_id, content)
+        async for event in stream_events(agent, thread_id, content, prior)
         if isinstance(event, TextDelta)
     ]
     return "".join(parts)
 
 
-async def stream_events(agent: Any, thread_id: str, content: UserContent) -> AsyncIterator[Event]:
+async def stream_events(
+    agent: Any,
+    thread_id: str,
+    content: UserContent,
+    prior: Sequence[PriorLine] | None = None,
+) -> AsyncIterator[Event]:
     """Yield text, reasoning and tool progress for one turn.
 
     ``content`` is the new user message. A string is a text turn. A list is
     the multimodal content blocks Deep Agents reads on the user message.
+    ``prior`` is the dialogue the page kept. When it is set, the turn forks
+    from the checkpoint just before the edited message instead of appending
+    onto the latest head.
     """
-    config = {"configurable": {"thread_id": thread_id}}
+    config = await _resume_config(agent, thread_id, prior)
     earlier = await _earlier_calls(agent, config)
     open_calls: dict[tuple[tuple[str, ...], int], str] = {}
     announced: set[str] = set()
@@ -119,6 +136,82 @@ async def stream_events(agent: Any, thread_id: str, content: UserContent) -> Asy
                     announced.add(event.call_id)
                     yield ToolStarted(event.call_id, event.name, subagent)
                 yield event
+
+
+async def _resume_config(
+    agent: Any,
+    thread_id: str,
+    prior: Sequence[PriorLine] | None,
+) -> dict[str, Any]:
+    """Choose the checkpoint this turn continues from.
+
+    A missing ``prior`` means the caller is appending, which is what the
+    terminal channel does. A present ``prior`` is the page's kept dialogue.
+    The matching finished checkpoint is the parent of the message being
+    sent, and running from it forks the thread. The older path stays in
+    the checkpointer.
+    """
+    config: dict[str, Any] = {"configurable": {"thread_id": thread_id}}
+    if prior is None or getattr(agent, "checkpointer", None) is None:
+        return config
+    wanted = [(role, text.strip()) for role, text in prior if text.strip()]
+    head = await agent.aget_state(config)
+    if _dialogue((head.values or {}).get("messages") or []) == wanted:
+        return config
+    async for snapshot in agent.aget_state_history(config):
+        messages = (snapshot.values or {}).get("messages") or []
+        if _dialogue(messages) != wanted:
+            continue
+        if not wanted or not snapshot.next:
+            return snapshot.config
+    await _install(agent, config, wanted)
+    return config
+
+
+async def _install(agent: Any, config: dict[str, Any], prior: list[PriorLine]) -> None:
+    """Replace the head's messages with ``prior`` when no checkpoint matches.
+
+    This is the restart case: the page still has the thread, and the
+    checkpointer does not. The old checkpoints are left stored.
+    """
+    messages: list[object] = [RemoveMessage(id=REMOVE_ALL_MESSAGES)]
+    messages.extend(
+        {"role": "user" if role == "user" else "assistant", "content": text}
+        for role, text in prior
+    )
+    await agent.aupdate_state(config, {"messages": messages})
+
+
+def _dialogue(messages: Iterable[object]) -> list[PriorLine]:
+    """Return the user and assistant text, joining a turn's answer into one line."""
+    lines: list[PriorLine] = []
+    for message in messages:
+        kind = getattr(message, "type", "")
+        text = _plain_text(getattr(message, "content", "")).strip()
+        if not text:
+            continue
+        if kind == "human":
+            lines.append(("user", text))
+        elif kind == "ai":
+            if lines and lines[-1][0] == "assistant":
+                lines[-1] = ("assistant", f"{lines[-1][1]}{text}")
+            else:
+                lines.append(("assistant", text))
+    return lines
+
+
+def _plain_text(content: object) -> str:
+    if isinstance(content, str):
+        return content
+    if not isinstance(content, list):
+        return ""
+    parts: list[str] = []
+    for block in content:
+        if isinstance(block, str):
+            parts.append(block)
+        elif isinstance(block, dict) and block.get("type") in (None, "text"):
+            parts.append(str(block.get("text", "")))
+    return "".join(parts)
 
 
 async def _earlier_calls(agent: Any, config: dict[str, Any]) -> set[str]:
