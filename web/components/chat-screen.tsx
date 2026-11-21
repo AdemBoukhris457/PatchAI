@@ -5,57 +5,31 @@ import {
   AssistantChatTransport,
   useAISDKRuntime,
 } from "@assistant-ui/ai-sdk"
-import { AssistantRuntimeProvider } from "@assistant-ui/react"
+import {
+  AssistantRuntimeProvider,
+  WebSpeechDictationAdapter,
+} from "@assistant-ui/react"
 import type { UIMessage } from "ai"
-import { useTheme } from "next-themes"
 import { useCallback, useEffect, useMemo, useState } from "react"
 
 import { ChatSidebar } from "@/components/chat-sidebar"
 import { Thread } from "@/components/thread.aui"
-import { Button } from "@/components/ui/button"
+import { UnsupportedFileNotice } from "@/components/unsupported-file"
+import { acceptedAttachmentAdapter } from "@/lib/attachment-adapter"
 import {
   SidebarInset,
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar"
 import {
+  attachFiles,
   createChat,
   loadChats,
+  sameMessages,
   saveChats,
   titleFrom,
   type StoredChat,
 } from "@/lib/chats"
-
-function ThemeButton() {
-  const { resolvedTheme, setTheme } = useTheme()
-  const [mounted, setMounted] = useState(false)
-
-  useEffect(() => {
-    setMounted(true)
-  }, [])
-
-  if (!mounted) {
-    return (
-      <Button type="button" variant="ghost" size="sm" disabled>
-        Theme
-      </Button>
-    )
-  }
-
-  const dark = resolvedTheme === "dark"
-
-  return (
-    <Button
-      type="button"
-      variant="ghost"
-      size="sm"
-      aria-label={dark ? "Use light theme" : "Use dark theme"}
-      onClick={() => setTheme(dark ? "light" : "dark")}
-    >
-      {dark ? "Light" : "Dark"}
-    </Button>
-  )
-}
 
 function ChatThread({
   chatId,
@@ -75,7 +49,10 @@ function ChatThread({
     messages: initialMessages,
     transport,
   })
-  const runtime = useAISDKRuntime(chat)
+  const dictation = useMemo(() => new WebSpeechDictationAdapter(), [])
+  const runtime = useAISDKRuntime(chat, {
+    adapters: { attachments: acceptedAttachmentAdapter, dictation },
+  })
 
   useEffect(() => {
     onMessages(chatId, chat.messages)
@@ -83,11 +60,17 @@ function ChatThread({
 
   return (
     <AssistantRuntimeProvider runtime={runtime}>
+      <UnsupportedFileNotice />
       <div className="flex min-h-0 w-full flex-1 flex-col">
         <Thread />
       </div>
     </AssistantRuntimeProvider>
   )
+}
+
+function withVisibleChat(chats: StoredChat[]) {
+  if (chats.some((chat) => !chat.archived)) return chats
+  return [createChat(), ...chats]
 }
 
 export function ChatScreen() {
@@ -97,10 +80,24 @@ export function ChatScreen() {
   const [ready, setReady] = useState(false)
 
   useEffect(() => {
-    const loaded = loadChats()
-    setChats(loaded)
-    setActiveId(loaded[0]?.id ?? null)
-    setReady(true)
+    let cancel = false
+    void attachFiles(loadChats()).then((loaded) => {
+      if (cancel) return
+      const kept = loaded.filter((chat) => chat.messages.length > 0)
+      if (kept.length !== loaded.length) saveChats(kept)
+      const next = kept.length > 0 ? kept : loaded
+      setChats(next)
+      setActiveId(
+        next.find((chat) => !chat.archived && chat.messages.length > 0)?.id ??
+          next.find((chat) => !chat.archived)?.id ??
+          next[0]?.id ??
+          null,
+      )
+      setReady(true)
+    })
+    return () => {
+      cancel = true
+    }
   }, [])
 
   const remember = useCallback((id: string, messages: UIMessage[]) => {
@@ -109,16 +106,14 @@ export function ChatScreen() {
       if (!existing) {
         return current
       }
-      const title = titleFrom(messages)
+      const auto = titleFrom(messages)
+      const previousAuto = titleFrom(existing.messages)
+      const title =
+        existing.title === previousAuto || existing.title === "New chat"
+          ? auto
+          : existing.title
       const same =
-        existing.title === title &&
-        existing.messages.length === messages.length &&
-        existing.messages.every(
-          (message, index) =>
-            message.id === messages[index]?.id &&
-            JSON.stringify(message.parts) ===
-              JSON.stringify(messages[index]?.parts),
-        )
+        existing.title === title && sameMessages(existing.messages, messages)
       if (same) {
         return current
       }
@@ -146,20 +141,53 @@ export function ChatScreen() {
       return
     }
     const chat = createChat()
-    const next = [chat, ...chats]
-    setChats(next)
-    saveChats(next)
+    setChats((current) => [chat, ...current])
     setActiveId(chat.id)
     setQuery("")
   }
 
   function deleteChat(id: string) {
     const remaining = chats.filter((chat) => chat.id !== id)
-    const next = remaining.length > 0 ? remaining : [createChat()]
+    const next = withVisibleChat(remaining)
     setChats(next)
     saveChats(next)
     if (id === activeId) {
-      setActiveId(next[0]?.id ?? null)
+      setActiveId(next.find((chat) => !chat.archived)?.id ?? null)
+    }
+  }
+
+  function renameChat(id: string, title: string) {
+    const nextTitle = title.trim()
+    if (!nextTitle) return
+    const next = chats.map((chat) =>
+      chat.id === id ? { ...chat, title: nextTitle } : chat,
+    )
+    setChats(next)
+    saveChats(next)
+  }
+
+  function pinChat(id: string) {
+    const next = chats.map((chat) => {
+      if (chat.id !== id) return chat
+      return chat.pinned
+        ? { ...chat, pinned: false, pinnedAt: undefined }
+        : { ...chat, pinned: true, pinnedAt: Date.now() }
+    })
+    setChats(next)
+    saveChats(next)
+  }
+
+  function archiveChat(id: string) {
+    const next = withVisibleChat(
+      chats.map((chat) =>
+        chat.id === id ? { ...chat, archived: !chat.archived } : chat,
+      ),
+    )
+    setChats(next)
+    saveChats(next)
+    const current = next.find((chat) => chat.id === id)
+    if (current?.archived && id === activeId) {
+      setActiveId(next.find((chat) => !chat.archived)?.id ?? null)
     }
   }
 
@@ -176,14 +204,14 @@ export function ChatScreen() {
         onNewChat={newChat}
         onSelect={openChat}
         onDelete={deleteChat}
+        onRename={renameChat}
+        onArchive={archiveChat}
+        onPin={pinChat}
       />
       <SidebarInset className="min-h-0">
         <header className="flex h-14 shrink-0 items-center gap-2 px-3">
           <SidebarTrigger />
           <h1 className="text-sm font-medium">PatchAI</h1>
-          <div className="ml-auto">
-            <ThemeButton />
-          </div>
         </header>
         {active ? (
           <ChatThread
