@@ -1,7 +1,4 @@
-type IncomingPart = {
-  type?: string
-  text?: string
-}
+import { turnFromParts, type IncomingPart } from "@/lib/content-blocks"
 
 type IncomingMessage = {
   role?: string
@@ -13,19 +10,15 @@ type Incoming = {
   messages?: IncomingMessage[]
 }
 
-function lastUserText(body: Incoming) {
+function lastUserParts(body: Incoming) {
   const messages = body.messages ?? []
   for (let index = messages.length - 1; index >= 0; index -= 1) {
     const message = messages[index]
-    if (message?.role !== "user") {
-      continue
+    if (message?.role === "user") {
+      return message.parts ?? []
     }
-    return (message.parts ?? [])
-      .filter((part) => part.type === "text" && typeof part.text === "string")
-      .map((part) => part.text)
-      .join("")
   }
-  return ""
+  return []
 }
 
 export async function POST(request: Request) {
@@ -36,9 +29,9 @@ export async function POST(request: Request) {
     return new Response("The message could not be read.", { status: 400 })
   }
 
-  const text = lastUserText(body).trim()
-  if (!text) {
-    return new Response("A message is required.", { status: 400 })
+  const turn = turnFromParts(lastUserParts(body))
+  if (!turn.ok) {
+    return new Response(turn.error, { status: 400 })
   }
 
   const threadId = body.id?.trim() || "web"
@@ -48,7 +41,7 @@ export async function POST(request: Request) {
     const upstream = await fetch(agentUrl, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ thread_id: threadId, text }),
+      body: JSON.stringify({ thread_id: threadId, ...turn.body }),
     })
     if (!upstream.ok || upstream.body === null) {
       const reply = await upstream.text()
