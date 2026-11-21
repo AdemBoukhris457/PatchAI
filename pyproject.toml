@@ -21,9 +21,13 @@ patchai = "patchai.app:run"
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]
+pdf = ["typst>=0.15,<0.16", "matplotlib>=3.8"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+"patchai.plugins.pdf_report" = ["template.typ"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
