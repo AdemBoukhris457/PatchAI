@@ -1,9 +1,8 @@
 """Turn a chat payload into the user message Deep Agents reads.
 
-A plain string stays a plain string. An attachment becomes one of the
-standard content blocks from the multimodal guide: ``image``, ``audio``,
-``video``, or ``file``. The MIME types are the ones ``read_file`` accepts
-for those same kinds of files.
+A plain string stays a plain string. An attachment becomes an image or a
+document block. Audio and video are refused: the OpenAI model in use
+reads text and images, and documents travel as file blocks.
 """
 
 from typing import TypeAlias
@@ -22,28 +21,6 @@ _IMAGE = {
     "image/heic": "image/heic",
     "image/heif": "image/heif",
 }
-_AUDIO = {
-    "audio/wav": "audio/wav",
-    "audio/x-wav": "audio/wav",
-    "audio/wave": "audio/wav",
-    "audio/mpeg": "audio/mpeg",
-    "audio/mp3": "audio/mpeg",
-    "audio/aiff": "audio/aiff",
-    "audio/x-aiff": "audio/aiff",
-    "audio/aac": "audio/aac",
-    "audio/ogg": "audio/ogg",
-    "audio/flac": "audio/flac",
-}
-_VIDEO = {
-    "video/mp4": "video/mp4",
-    "video/mpeg": "video/mpeg",
-    "video/quicktime": "video/quicktime",
-    "video/x-msvideo": "video/x-msvideo",
-    "video/x-flv": "video/x-flv",
-    "video/webm": "video/webm",
-    "video/x-ms-wmv": "video/x-ms-wmv",
-    "video/3gpp": "video/3gpp",
-}
 _DOCUMENT = {
     "application/pdf": "application/pdf",
     "application/vnd.ms-powerpoint": "application/vnd.ms-powerpoint",
@@ -53,8 +30,6 @@ _DOCUMENT = {
 }
 _KINDS = {
     "image": _IMAGE,
-    "audio": _AUDIO,
-    "video": _VIDEO,
     "file": _DOCUMENT,
 }
 _FILE_NAMES = {

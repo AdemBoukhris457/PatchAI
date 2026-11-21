@@ -1,8 +1,8 @@
 /**
  * Turn the last user message into the content Deep Agents reads.
  *
- * Text stays text. A file part becomes an image, audio, video, or file
- * block, using the same kinds the multimodal guide gives `read_file`.
+ * Text stays text. A file part becomes an image or a document block.
+ * Audio and video are refused.
  */
 
 type MediaKind = "image" | "audio" | "video" | "file"
@@ -44,30 +44,6 @@ const IMAGE: Record<string, string> = {
   "image/heif": "image/heif",
 }
 
-const AUDIO: Record<string, string> = {
-  "audio/wav": "audio/wav",
-  "audio/x-wav": "audio/wav",
-  "audio/wave": "audio/wav",
-  "audio/mpeg": "audio/mpeg",
-  "audio/mp3": "audio/mpeg",
-  "audio/aiff": "audio/aiff",
-  "audio/x-aiff": "audio/aiff",
-  "audio/aac": "audio/aac",
-  "audio/ogg": "audio/ogg",
-  "audio/flac": "audio/flac",
-}
-
-const VIDEO: Record<string, string> = {
-  "video/mp4": "video/mp4",
-  "video/mpeg": "video/mpeg",
-  "video/quicktime": "video/quicktime",
-  "video/x-msvideo": "video/x-msvideo",
-  "video/x-flv": "video/x-flv",
-  "video/webm": "video/webm",
-  "video/x-ms-wmv": "video/x-ms-wmv",
-  "video/3gpp": "video/3gpp",
-}
-
 const DOCUMENT: Record<string, string> = {
   "application/pdf": "application/pdf",
   "application/vnd.ms-powerpoint": "application/vnd.ms-powerpoint",
@@ -77,8 +53,6 @@ const DOCUMENT: Record<string, string> = {
 
 const BY_MIME: Record<string, { kind: MediaKind; mime: string }> = {
   ...named("image", IMAGE),
-  ...named("audio", AUDIO),
-  ...named("video", VIDEO),
   ...named("file", DOCUMENT),
 }
 
@@ -90,27 +64,30 @@ const BY_EXTENSION: Record<string, { kind: MediaKind; mime: string }> = {
   webp: { kind: "image", mime: "image/webp" },
   heic: { kind: "image", mime: "image/heic" },
   heif: { kind: "image", mime: "image/heif" },
-  mp4: { kind: "video", mime: "video/mp4" },
-  mpeg: { kind: "video", mime: "video/mpeg" },
-  mpg: { kind: "video", mime: "video/mpeg" },
-  mov: { kind: "video", mime: "video/quicktime" },
-  avi: { kind: "video", mime: "video/x-msvideo" },
-  flv: { kind: "video", mime: "video/x-flv" },
-  webm: { kind: "video", mime: "video/webm" },
-  wmv: { kind: "video", mime: "video/x-ms-wmv" },
-  "3gpp": { kind: "video", mime: "video/3gpp" },
-  wav: { kind: "audio", mime: "audio/wav" },
-  mp3: { kind: "audio", mime: "audio/mpeg" },
-  aiff: { kind: "audio", mime: "audio/aiff" },
-  aac: { kind: "audio", mime: "audio/aac" },
-  ogg: { kind: "audio", mime: "audio/ogg" },
-  flac: { kind: "audio", mime: "audio/flac" },
   pdf: { kind: "file", mime: "application/pdf" },
   ppt: { kind: "file", mime: "application/vnd.ms-powerpoint" },
   pptx: {
     kind: "file",
     mime: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
   },
+}
+
+/** Extensions and MIME types the composer may attach. */
+export const ACCEPTED_FILE_ACCEPT = [
+  ...Object.keys(BY_EXTENSION).map((extension) => `.${extension}`),
+  ...new Set([
+    ...Object.keys(BY_MIME),
+    ...Object.values(BY_EXTENSION).map((entry) => entry.mime),
+  ]),
+].join(",")
+
+export type UploadKind = { kind: MediaKind; mime: string }
+
+export function classifyUpload(
+  name: string | undefined,
+  mime: string | undefined,
+): UploadKind | undefined {
+  return mediaOf({ filename: name, mediaType: mime })
 }
 
 function named(kind: MediaKind, table: Record<string, string>) {
@@ -161,7 +138,7 @@ export function turnFromParts(parts: IncomingPart[]): Turn {
   return { ok: true, body: { content: blocks } }
 }
 
-function mediaOf(part: IncomingPart) {
+function mediaOf(part: Pick<IncomingPart, "filename" | "mediaType">) {
   const mime = (part.mediaType ?? "").split(";", 1)[0]?.trim().toLowerCase()
   const fromMime = mime ? BY_MIME[mime] : undefined
   if (fromMime && mime !== "application/octet-stream") return fromMime

@@ -63,26 +63,27 @@ def test_pdf_bytes_become_a_named_file_block() -> None:
     ]
 
 
-def test_video_url_stays_a_url_block() -> None:
-    content = parse_turn(
-        {
-            "content": [
-                {
-                    "type": "video",
-                    "url": "https://example.com/clip.mp4",
-                    "mime_type": "video/mp4",
-                }
-            ]
-        }
-    )
-
-    assert content == [
-        {
-            "type": "video",
-            "url": "https://example.com/clip.mp4",
-            "mime_type": "video/mp4",
-        }
-    ]
+def test_video_and_audio_are_rejected() -> None:
+    with pytest.raises(TurnError, match="not supported"):
+        parse_turn(
+            {
+                "content": [
+                    {
+                        "type": "video",
+                        "url": "https://example.com/clip.mp4",
+                        "mime_type": "video/mp4",
+                    }
+                ]
+            }
+        )
+    with pytest.raises(TurnError, match="not supported"):
+        parse_turn(
+            {
+                "content": [
+                    {"type": "audio", "base64": "cccc", "mime_type": "audio/mpeg"}
+                ]
+            }
+        )
 
 
 def test_unknown_media_type_is_rejected() -> None:
@@ -96,15 +97,3 @@ def test_unknown_media_type_is_rejected() -> None:
         )
 
 
-def test_audio_block_is_accepted() -> None:
-    content = parse_turn(
-        {
-            "content": [
-                {"type": "audio", "base64": "cccc", "mime_type": "audio/mpeg"}
-            ]
-        }
-    )
-
-    assert content == [
-        {"type": "audio", "base64": "cccc", "mime_type": "audio/mpeg"}
-    ]
