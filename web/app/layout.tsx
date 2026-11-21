@@ -2,9 +2,11 @@ import type { Metadata } from "next"
 import { Inter } from "next/font/google"
 
 import "katex/dist/katex.min.css"
+import "sonner/dist/styles.css"
 import "streamdown/styles.css"
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
+import { Toaster } from "@/components/ui/sonner"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
 
@@ -32,6 +34,7 @@ export default function RootLayout({
       <body suppressHydrationWarning>
         <ThemeProvider>
           <TooltipProvider>{children}</TooltipProvider>
+          <Toaster position="top-right" offset={16} />
         </ThemeProvider>
       </body>
     </html>
