@@ -69,6 +69,7 @@ export async function POST(request: Request) {
         prior: priorLines(body),
         ...turn.body,
       }),
+      signal: request.signal,
     })
     if (!upstream.ok || upstream.body === null) {
       const reply = await upstream.text()
@@ -83,7 +84,13 @@ export async function POST(request: Request) {
         "x-vercel-ai-ui-message-stream": "v1",
       },
     })
-  } catch {
+  } catch (error) {
+    if (
+      request.signal.aborted ||
+      (error instanceof Error && error.name === "AbortError")
+    ) {
+      return new Response(null, { status: 499 })
+    }
     return new Response(
       "PatchAI is not running. Start it with the web channel.",
       { status: 502 },

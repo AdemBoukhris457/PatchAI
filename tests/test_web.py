@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import socket
 import urllib.error
 import urllib.request
 
@@ -182,6 +183,62 @@ async def test_web_channel_passes_the_kept_dialogue() -> None:
     assert seen == [("My name is Ana.", [("user", "My name is Bob."), ("assistant", "Hi Bob.")])]
     assert broken == 400
     assert broken_body == "The message could not be read."
+
+
+@pytest.mark.asyncio
+async def test_closing_the_stream_cancels_the_run() -> None:
+    cancelled = asyncio.Event()
+    continued = asyncio.Event()
+
+    async def handler(session_id: str, user_id: str, content: object, prior=None):
+        del session_id, user_id, content, prior
+        yield TextDelta("hel")
+        try:
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            cancelled.set()
+            raise
+        continued.set()
+        yield TextDelta("lo")
+
+    channel = WebChannel("127.0.0.1", 0)
+    task = asyncio.create_task(channel.serve(handler))
+    try:
+        for _ in range(50):
+            if channel.ready:
+                break
+            await asyncio.sleep(0.02)
+        else:
+            raise AssertionError("The web channel did not bind.")
+
+        await asyncio.to_thread(_read_then_close, channel.port, b"hel")
+        await asyncio.wait_for(cancelled.wait(), 2)
+    finally:
+        channel.close()
+        await task
+
+    assert not continued.is_set()
+
+
+def _read_then_close(port: int, marker: bytes) -> None:
+    """Read until ``marker`` arrives, then hang up."""
+    body = json.dumps({"thread_id": "web", "text": "hello"}).encode()
+    request = (
+        "POST /chat HTTP/1.1\r\n"
+        "Host: 127.0.0.1\r\n"
+        "Content-Type: application/json\r\n"
+        f"Content-Length: {len(body)}\r\n"
+        "Connection: close\r\n"
+        "\r\n"
+    ).encode() + body
+    with socket.create_connection(("127.0.0.1", port), timeout=5) as sock:
+        sock.sendall(request)
+        received = b""
+        while marker not in received:
+            chunk = sock.recv(4096)
+            if not chunk:
+                break
+            received += chunk
 
 
 def _post(port: int, payload: dict[str, object]) -> tuple[int, str]:

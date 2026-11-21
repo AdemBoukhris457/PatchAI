@@ -10,7 +10,11 @@ from __future__ import annotations
 
 import asyncio
 import json
+import select
+import socket
 from collections.abc import AsyncIterator, Awaitable, Callable, Coroutine
+from concurrent.futures import CancelledError as RunCancelled
+from concurrent.futures import Future
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from patchai.channels import ui_stream
@@ -68,25 +72,42 @@ def _plain(handler: BaseHTTPRequestHandler, status: int, text: str) -> None:
     handler.wfile.write(body)
 
 
+_POLL_SECONDS = 0.1
+
+
 def _stream(
     handler: BaseHTTPRequestHandler,
     loop: asyncio.AbstractEventLoop,
     events: AsyncIterator[Event],
 ) -> None:
-    """Write ``events`` as UI message stream parts in HTTP chunks."""
+    """Write ``events`` as UI message stream parts in HTTP chunks.
+
+    Closing the stream is the stop button. The run is cancelled when the
+    client goes away, which is the disconnect behaviour Deep Agents uses
+    for a streamed run. A tool call that was cancelled before it returned
+    is repaired by the agent's patch middleware on the next turn.
+    """
     queue: asyncio.Queue[str | None] = asyncio.Queue()
 
     async def produce() -> None:
         try:
             async for piece in ui_stream.encode(events):
                 await queue.put(piece)
+        except asyncio.CancelledError:
+            raise
         finally:
-            await queue.put(None)
+            current = asyncio.current_task()
+            if current is None or not current.cancelling():
+                await queue.put(None)
 
-    asyncio.run_coroutine_threadsafe(produce(), loop)
+    running = asyncio.run_coroutine_threadsafe(produce(), loop)
+    waiting: Future[str | None] | None = None
 
-    def take() -> str | None:
-        return asyncio.run_coroutine_threadsafe(queue.get(), loop).result()
+    def next_piece() -> str | None:
+        nonlocal waiting
+        if waiting is None:
+            waiting = asyncio.run_coroutine_threadsafe(queue.get(), loop)
+        return waiting.result(_POLL_SECONDS)
 
     handler.protocol_version = "HTTP/1.1"
     handler.send_response(200)
@@ -95,10 +116,53 @@ def _stream(
     handler.send_header("Transfer-Encoding", "chunked")
     handler.send_header("Connection", "close")
     handler.end_headers()
-    while (piece := take()) is not None:
-        _write_chunk(handler, piece)
-    handler.wfile.write(b"0\r\n\r\n")
-    handler.wfile.flush()
+    try:
+        while True:
+            if _client_closed(handler):
+                _cancel(running, waiting)
+                return
+            try:
+                piece = next_piece()
+            except TimeoutError:
+                continue
+            waiting = None
+            if piece is None:
+                break
+            _write_chunk(handler, piece)
+        handler.wfile.write(b"0\r\n\r\n")
+        handler.wfile.flush()
+    except OSError:
+        _cancel(running, waiting)
+        return
+    running.result()
+
+
+def _cancel(running: Future[None], waiting: Future[str | None] | None) -> None:
+    """Stop the agent task and the queue read that is waiting on it."""
+    running.cancel()
+    if waiting is not None:
+        waiting.cancel()
+    try:
+        running.result(timeout=5)
+    except (RunCancelled, TimeoutError):
+        return
+
+
+def _client_closed(handler: BaseHTTPRequestHandler) -> bool:
+    """Return whether the browser has hung up."""
+    sock = handler.connection
+    try:
+        readable, _, _ = select.select([sock], [], [], 0)
+    except (OSError, ValueError):
+        return True
+    if not readable:
+        return False
+    try:
+        return sock.recv(1, socket.MSG_PEEK) == b""
+    except BlockingIOError:
+        return False
+    except OSError:
+        return True
 
 
 def _write_chunk(handler: BaseHTTPRequestHandler, text: str) -> None:

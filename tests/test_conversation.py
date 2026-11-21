@@ -1,5 +1,6 @@
 """One turn streams text and tool progress as channel-neutral events."""
 
+import asyncio
 import json
 from collections.abc import Iterator
 from typing import Any
@@ -104,6 +105,55 @@ async def test_ask_returns_only_the_answer_text() -> None:
     )
 
     assert await ask(agent, "thread", "what time is it") == "It is noon. "
+
+
+class PausingModel(BaseChatModel):
+    """Waits inside the model call so a cancel can land before the answer."""
+
+    started: asyncio.Event
+    release: asyncio.Event
+
+    model_config = {"arbitrary_types_allowed": True}
+
+    @property
+    def _llm_type(self) -> str:
+        return "pausing"
+
+    def bind_tools(self, tools, **kwargs):  # noqa: ANN001, ANN003
+        return self
+
+    def _generate(
+        self, messages: list[BaseMessage], stop=None, run_manager=None, **kwargs: Any  # noqa: ANN001
+    ) -> ChatResult:
+        raise AssertionError("the cancel test must take the async path")
+
+    async def _astream(
+        self, messages: list[BaseMessage], stop=None, run_manager=None, **kwargs: Any  # noqa: ANN001
+    ) -> Any:
+        self.started.set()
+        await self.release.wait()
+        yield ChatGenerationChunk(message=AIMessageChunk(content="should-not-land"))
+
+
+@pytest.mark.asyncio
+async def test_cancelling_the_stream_stops_before_the_answer_is_saved() -> None:
+    started = asyncio.Event()
+    release = asyncio.Event()
+    agent = build_agent(
+        Settings(channel="web", model="pausing", plugins=(), mcp_config="mcp.json"),
+        model=PausingModel(started=started, release=release),
+    )
+    task = asyncio.create_task(ask(agent, "stop", "hello"))
+    await asyncio.wait_for(started.wait(), 5)
+
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+
+    state = agent.get_state({"configurable": {"thread_id": "stop"}})
+    contents = [getattr(message, "content", "") for message in state.values["messages"]]
+    assert "should-not-land" not in contents
+    assert any(content == "hello" for content in contents)
 
 
 @pytest.mark.asyncio
