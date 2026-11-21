@@ -1,6 +1,7 @@
 .cursor/
 
 .env
+exports/
 .venv/
 venv/
 
