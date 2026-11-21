@@ -12,6 +12,7 @@ import {
   ContextRing,
 } from "@/components/composer-tools";
 import { File, getFileHref } from "@/components/file";
+import { PdfArtifact } from "@/components/pdf-card";
 import { ThreadFollowupSuggestions } from "@/components/follow-up-suggestions.aui";
 import { Image } from "@/components/image";
 import { normalizeMath } from "@/lib/math";
@@ -106,11 +107,20 @@ export type ThreadComponents = {
   ComposerExtra?: ComponentType | undefined;
 };
 
-const messageGroupBy = groupPartByType({
+const groupedMessage = groupPartByType({
   reasoning: ["group-chainOfThought", "group-reasoning"],
   "tool-call": ["group-chainOfThought", "group-tool"],
   "standalone-tool-call": [],
 });
+
+const PDF_TOOLS = new Set(["create_pdf", "update_pdf"]);
+
+const messageGroupBy: typeof groupedMessage = (part, context) => {
+  if (part.type === "tool-call" && PDF_TOOLS.has(part.toolName)) {
+    return [];
+  }
+  return groupedMessage(part, context);
+};
 
 type ThreadGroupKey =
   | "group-chainOfThought"
@@ -677,6 +687,16 @@ const AssistantMessage: FC = () => {
               case "reasoning":
                 return <Reasoning {...part} />;
               case "tool-call":
+                if (PDF_TOOLS.has(part.toolName)) {
+                  return (
+                    <PdfArtifact
+                      argsText={part.argsText}
+                      result={part.result}
+                      status={part.status}
+                      isError={part.isError}
+                    />
+                  );
+                }
                 return part.toolUI ?? <ToolFallbackComponent {...part} />;
               case "data":
                 return part.dataRendererUI;

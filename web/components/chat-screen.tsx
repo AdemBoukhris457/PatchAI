@@ -13,6 +13,7 @@ import type { UIMessage } from "ai"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 
 import { ChatSidebar } from "@/components/chat-sidebar"
+import { PdfPreviewPanel, PdfPreviewProvider } from "@/components/pdf-preview"
 import { Thread } from "@/components/thread.aui"
 import { UnsupportedFileNotice } from "@/components/unsupported-file"
 import { acceptedAttachmentAdapter } from "@/lib/attachment-adapter"
@@ -78,10 +79,15 @@ function ChatThread({
 
   return (
     <AssistantRuntimeProvider runtime={runtime}>
-      <UnsupportedFileNotice />
-      <div className="flex min-h-0 w-full flex-1 flex-col">
-        <Thread />
-      </div>
+      <PdfPreviewProvider>
+        <UnsupportedFileNotice />
+        <div className="relative flex min-h-0 w-full flex-1">
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+            <Thread />
+          </div>
+          <PdfPreviewPanel />
+        </div>
+      </PdfPreviewProvider>
     </AssistantRuntimeProvider>
   )
 }

@@ -1,4 +1,4 @@
-const LABELS: Record<string, { running: string; done: string }> = {
+const LABELS: Record<string, { running: string; done: string; plain?: string }> = {
   write_todos: { running: "Planning", done: "Made a plan" },
   task: { running: "Working with a helper agent", done: "Helper agent finished" },
   ls: { running: "Listing files", done: "Listed files" },
@@ -7,6 +7,11 @@ const LABELS: Record<string, { running: string; done: string }> = {
   edit_file: { running: "Editing a file", done: "Edited a file" },
   glob: { running: "Finding files", done: "Found files" },
   grep: { running: "Searching files", done: "Searched files" },
+  read_pdf_source: {
+    running: "Reading the document",
+    done: "Read the document",
+    plain: "the document",
+  },
 }
 
 function humanize(name: string) {
@@ -19,7 +24,7 @@ export function toolPhrase(
 ) {
   if (state === "running") return toolLabel(name, false)
   if (state === "done") return toolLabel(name, true)
-  const plain = humanize(name)
+  const plain = LABELS[name]?.plain ?? humanize(name)
   if (state === "waiting") return `Waiting on ${plain}`
   if (state === "cancelled") return `Stopped checking ${plain}`
   return `Couldn't check ${plain}`
