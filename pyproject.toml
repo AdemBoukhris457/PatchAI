@@ -22,6 +22,7 @@ patchai = "patchai.app:run"
 [project.optional-dependencies]
 dev = ["pytest>=8"]
 pdf = ["typst>=0.15,<0.16", "matplotlib>=3.8"]
+pptx = ["python-pptx>=1.0.2,<2"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
