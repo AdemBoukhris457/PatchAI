@@ -42,7 +42,14 @@ import {
 } from "./pieces"
 import { AssistantFileUpload, NotraFileUpload } from "./uploads"
 import { FileTypeGallery } from "./file-looks"
+import {
+  AssistantArtifactCard,
+  AssistantFileRow,
+  NotraDownloadAction,
+  NotraFileChip,
+} from "./downloads"
 import { AssistantPinnedList, NotraFavoriteGroup } from "./favorites"
+import { AssistantPdfCanvas } from "./viewers"
 import {
   AssistantRailSidebar,
   AssistantThreadSidebar,
@@ -322,6 +329,47 @@ const sidebarOptions: Piece[] = [
   },
 ]
 
+const downloadOptions: Piece[] = [
+  {
+    id: "dl-aui-file",
+    name: "assistant-ui file row",
+    library: "assistant-ui",
+    note: "The same document row an uploaded PDF uses. The icon names the file, the size sits under it, and the download icon saves it.",
+    Mock: AssistantFileRow,
+  },
+  {
+    id: "dl-aui-artifact",
+    name: "assistant-ui artifact card",
+    library: "assistant-ui",
+    note: "The card for a document the agent is writing. While it writes, the caption shimmers with a word count. When it is done, the caption names the file and the whole card downloads it. The arrow shows on hover.",
+    Mock: AssistantArtifactCard,
+  },
+  {
+    id: "dl-notra-chip",
+    name: "Notra file chip",
+    library: "Notra UI",
+    note: "Notra has no generated-file card. This is the chip it uses for a file, with the document icon and the name. The chip itself is the download.",
+    Mock: NotraFileChip,
+  },
+  {
+    id: "dl-notra-action",
+    name: "Notra download action",
+    library: "Notra UI",
+    note: "Perplexity's answer bar. A ghost download button sits under the reply, and Download is also an item in More. There is no file card.",
+    Mock: NotraDownloadAction,
+  },
+]
+
+const viewerOptions: Piece[] = [
+  {
+    id: "view-aui-canvas",
+    name: "assistant-ui canvas",
+    library: "assistant-ui",
+    note: "The chat narrows and the document takes the rest, the way Claude and ChatGPT open a file beside the thread. The menu jumps to a page. Scrolling the pages moves the menu with you. Notra’s sheet has no page control.",
+    Mock: AssistantPdfCanvas,
+  },
+]
+
 const favoriteOptions: Piece[] = [
   {
     id: "fav-aui-pinned",
@@ -343,7 +391,7 @@ const shellNames = new Map(
   [...notraShells, ...assistantShells].map((shell) => [shell.id, shell.name]),
 )
 const pieceNames = new Map(
-  [...pieceOptions, ...warningOptions, ...themeOptions, ...sidebarOptions, ...favoriteOptions].map((piece) => [
+  [...pieceOptions, ...warningOptions, ...themeOptions, ...sidebarOptions, ...downloadOptions, ...viewerOptions, ...favoriteOptions].map((piece) => [
     piece.id,
     piece.name,
   ]),
@@ -575,6 +623,82 @@ export function Gallery() {
                   </div>
                   <p className="mb-3 text-xs text-neutral-600">{piece.note}</p>
                   <Mock />
+                </section>
+              )
+            })}
+          </div>
+        </section>
+
+        <section className="mt-10">
+          <h2 className="text-lg font-medium">Where the PDF opens</h2>
+          <p className="mt-1 max-w-2xl text-sm text-neutral-600">
+            assistant-ui’s canvas is the panel Claude and ChatGPT use: the document sits beside the chat, on its own pages. Open the menu to jump, or scroll the pages and the menu follows.
+          </p>
+          <div className="mt-4 grid gap-4">
+            {viewerOptions.map((piece) => {
+              const marked = pieces.includes(piece.id)
+              const Mock = piece.Mock
+              return (
+                <section
+                  key={piece.id}
+                  id={piece.id}
+                  className={`rounded-2xl border bg-white p-3 ${marked ? "border-neutral-950" : "border-neutral-200"}`}
+                >
+                  <div className="mb-3 flex items-start justify-between gap-2">
+                    <div>
+                      <h3 className="text-sm font-medium">{piece.name}</h3>
+                      <p className="text-xs text-neutral-500">{piece.library}</p>
+                    </div>
+                    <button
+                      type="button"
+                      aria-pressed={marked}
+                      onClick={() => togglePiece(piece.id)}
+                      className={`shrink-0 rounded-full px-2.5 py-1 text-xs outline-none focus-visible:ring-2 ${marked ? "bg-neutral-950 text-white" : "border"}`}
+                    >
+                      {marked ? "Marked" : "Mark"}
+                    </button>
+                  </div>
+                  <p className="mb-3 text-xs text-neutral-600">{piece.note}</p>
+                  <Mock />
+                </section>
+              )
+            })}
+          </div>
+        </section>
+
+        <section className="mt-10">
+          <h2 className="text-lg font-medium">When the agent makes a PDF</h2>
+          <p className="mt-1 max-w-2xl text-sm text-neutral-600">
+            The chat uses the assistant-ui artifact card. The other looks stay here if you want to compare. Each sample still downloads a small file.
+          </p>
+          <div className="mt-4 grid gap-4 md:grid-cols-2">
+            {downloadOptions.map((piece) => {
+              const marked = pieces.includes(piece.id)
+              const Mock = piece.Mock
+              return (
+                <section
+                  key={piece.id}
+                  id={piece.id}
+                  className={`flex flex-col rounded-2xl border bg-white p-3 ${marked ? "border-neutral-950" : "border-neutral-200"}`}
+                >
+                  <div className="mb-3 flex items-start justify-between gap-2">
+                    <div>
+                      <h3 className="text-sm font-medium">{piece.name}</h3>
+                      <p className="text-xs text-neutral-500">{piece.library}</p>
+                    </div>
+                    <button
+                      type="button"
+                      aria-pressed={marked}
+                      onClick={() => togglePiece(piece.id)}
+                      className={`shrink-0 rounded-full px-2.5 py-1 text-xs outline-none focus-visible:ring-2 ${marked ? "bg-neutral-950 text-white" : "border"}`}
+                    >
+                      {marked ? "Marked" : "Mark"}
+                    </button>
+                  </div>
+                  <p className="mb-3 text-xs text-neutral-600">{piece.note}</p>
+                  <div className="mt-auto rounded-xl bg-neutral-100 p-4">
+                    <Mock />
+                  </div>
                 </section>
               )
             })}
