@@ -8,7 +8,7 @@ import {
 } from "react";
 import {
   XIcon,
-  PlusIcon,
+  PaperclipIcon,
   FileText,
   Loader2Icon,
   AlertCircleIcon,
@@ -17,6 +17,7 @@ import {
   AttachmentPrimitive,
   ComposerPrimitive,
   MessagePrimitive,
+  useAuiState,
 } from "@assistant-ui/react";
 import {
   Tooltip,
@@ -31,7 +32,10 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { File, getFileHref } from "@/components/file";
+import { Image } from "@/components/image";
 import { TooltipIconButton } from "@/components/tooltip-icon-button";
+import { classifyUpload } from "@/lib/content-blocks";
 import { useAttachmentState } from "./attachment-state";
 import { cn } from "@/lib/utils";
 
@@ -206,11 +210,86 @@ const AttachmentRemove: FC<{ name: string }> = ({ name }) => {
   );
 };
 
+const MessageAttachment: FC = () => {
+  const name = useAuiState((s) => s.attachment.name);
+  const contentType = useAuiState((s) => s.attachment.contentType);
+  const part = useAuiState((s) =>
+    s.attachment.status.type === "complete"
+      ? s.attachment.content?.[0]
+      : undefined,
+  );
+
+  if (!part) return <AttachmentUI />;
+
+  const filename =
+    "filename" in part && typeof part.filename === "string"
+      ? part.filename
+      : name;
+
+  if (part.type === "image" && part.image) {
+    return (
+      <div className="w-full max-w-96">
+        <Image
+          type="image"
+          image={part.image}
+          filename={filename}
+          status={{ type: "complete" }}
+        />
+      </div>
+    );
+  }
+
+  if (part.type !== "file" || !part.data) {
+    return <AttachmentUI />;
+  }
+
+  const declared =
+    part.mimeType || contentType || "application/octet-stream";
+  const media = classifyUpload(filename, declared);
+  const mimeType = media?.mime ?? declared;
+
+  if (media?.kind === "image") {
+    const image = getFileHref(part.data, mimeType, part.sourceType);
+    if (!image) return <AttachmentUI />;
+    return (
+      <div className="w-full max-w-96">
+        <Image
+          type="image"
+          image={image}
+          filename={filename}
+          status={{ type: "complete" }}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className={cn(
+        media?.kind === "audio" || media?.kind === "video"
+          ? "w-full max-w-xl"
+          : "w-fit max-w-sm",
+      )}
+    >
+      <File
+        type="file"
+        data={part.data}
+        mimeType={mimeType}
+        filename={filename}
+        {...(part.sourceType !== undefined && {
+          sourceType: part.sourceType,
+        })}
+        status={{ type: "complete" }}
+      />
+    </div>
+  );
+};
+
 export const UserMessageAttachments: FC = () => {
   return (
-    <div className="aui-user-message-attachments-end col-span-full col-start-1 row-start-1 flex w-full flex-row justify-end gap-2 empty:hidden">
+    <div className="aui-user-message-attachments-end col-span-full col-start-1 row-start-1 flex w-full flex-col items-end gap-2 empty:hidden">
       <MessagePrimitive.Attachments>
-        {() => <AttachmentUI />}
+        {() => <MessageAttachment />}
       </MessagePrimitive.Attachments>
     </div>
   );
@@ -231,16 +310,16 @@ export const ComposerAddAttachment: FC = () => {
     <ComposerPrimitive.AddAttachment
       render={
         <TooltipIconButton
-          tooltip="Add Attachment"
+          tooltip="Attach"
           side="bottom"
           variant="ghost"
           size="icon"
-          className="aui-composer-add-attachment text-muted-foreground hover:text-foreground hover:bg-muted-foreground/15 dark:border-muted-foreground/15 dark:hover:bg-muted-foreground/30 size-7 rounded-full active:scale-[0.96] motion-reduce:transition-none"
-          aria-label="Add Attachment"
+          className="aui-composer-add-attachment text-muted-foreground hover:text-foreground hover:bg-muted-foreground/15 dark:border-muted-foreground/15 dark:hover:bg-muted-foreground/30 size-8 rounded-full active:scale-[0.96] motion-reduce:transition-none"
+          aria-label="Attach"
         />
       }
     >
-      <PlusIcon className="aui-attachment-add-icon size-4" />
+      <PaperclipIcon className="aui-attachment-add-icon size-4" />
     </ComposerPrimitive.AddAttachment>
   );
 };
