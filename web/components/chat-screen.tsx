@@ -10,7 +10,7 @@ import {
   WebSpeechDictationAdapter,
 } from "@assistant-ui/react"
 import type { UIMessage } from "ai"
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 
 import { ChatSidebar } from "@/components/chat-sidebar"
 import { Thread } from "@/components/thread.aui"
@@ -44,19 +44,37 @@ function ChatThread({
     () => new AssistantChatTransport({ api: "/api/chat" }),
     [],
   )
+  // Each chat remounts this thread, so the seed is the list from that mount.
+  const seeded = useRef(initialMessages)
   const chat = useChat({
     id: chatId,
-    messages: initialMessages,
+    messages: seeded.current,
     transport,
+    throttle: 50,
   })
   const dictation = useMemo(() => new WebSpeechDictationAdapter(), [])
-  const runtime = useAISDKRuntime(chat, {
-    adapters: { attachments: acceptedAttachmentAdapter, dictation },
-  })
+  const adapters = useMemo(
+    () => ({ attachments: acceptedAttachmentAdapter, dictation }),
+    [dictation],
+  )
+  const runtime = useAISDKRuntime(chat, { adapters })
+  const latest = useRef({ chatId, messages: chat.messages, onMessages })
+  latest.current = { chatId, messages: chat.messages, onMessages }
 
   useEffect(() => {
-    onMessages(chatId, chat.messages)
+    const handle = window.setTimeout(() => {
+      const current = latest.current
+      current.onMessages(current.chatId, current.messages)
+    }, 80)
+    return () => window.clearTimeout(handle)
   }, [chat.messages, chatId, onMessages])
+
+  useEffect(() => {
+    return () => {
+      const current = latest.current
+      current.onMessages(current.chatId, current.messages)
+    }
+  }, [])
 
   return (
     <AssistantRuntimeProvider runtime={runtime}>
