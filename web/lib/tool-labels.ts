@@ -12,6 +12,11 @@ const LABELS: Record<string, { running: string; done: string; plain?: string }> 
     done: "Read the document",
     plain: "the document",
   },
+  read_pptx_source: {
+    running: "Reading the deck",
+    done: "Read the deck",
+    plain: "the deck",
+  },
 }
 
 function humanize(name: string) {

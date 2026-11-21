@@ -12,6 +12,7 @@ import {
   ContextRing,
 } from "@/components/composer-tools";
 import { File, getFileHref } from "@/components/file";
+import { DeckArtifact } from "@/components/deck-card";
 import { PdfArtifact } from "@/components/pdf-card";
 import { ThreadFollowupSuggestions } from "@/components/follow-up-suggestions.aui";
 import { Image } from "@/components/image";
@@ -114,9 +115,10 @@ const groupedMessage = groupPartByType({
 });
 
 const PDF_TOOLS = new Set(["create_pdf", "update_pdf"]);
+const DECK_TOOLS = new Set(["create_pptx", "update_pptx"]);
 
 const messageGroupBy: typeof groupedMessage = (part, context) => {
-  if (part.type === "tool-call" && PDF_TOOLS.has(part.toolName)) {
+  if (part.type === "tool-call" && (PDF_TOOLS.has(part.toolName) || DECK_TOOLS.has(part.toolName))) {
     return [];
   }
   return groupedMessage(part, context);
@@ -690,6 +692,16 @@ const AssistantMessage: FC = () => {
                 if (PDF_TOOLS.has(part.toolName)) {
                   return (
                     <PdfArtifact
+                      argsText={part.argsText}
+                      result={part.result}
+                      status={part.status}
+                      isError={part.isError}
+                    />
+                  );
+                }
+                if (DECK_TOOLS.has(part.toolName)) {
+                  return (
+                    <DeckArtifact
                       argsText={part.argsText}
                       result={part.result}
                       status={part.status}

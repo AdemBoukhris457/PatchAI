@@ -12,6 +12,7 @@ import {
 } from "react"
 import type { PDFDocumentProxy, RenderTask } from "pdfjs-dist"
 
+import { DeckCanvas } from "@/components/deck-preview"
 import { ghostButton } from "@/components/surfaces"
 import { cn } from "@/lib/utils"
 
@@ -57,6 +58,9 @@ export function usePdfPreview() {
 export function PdfPreviewPanel() {
   const preview = usePdfPreview()
   if (!preview?.document) return null
+  if (preview.document.filename.endsWith(".pptx")) {
+    return <DeckCanvas document={preview.document} onClose={preview.close} />
+  }
   return <PdfCanvas document={preview.document} onClose={preview.close} />
 }
 
