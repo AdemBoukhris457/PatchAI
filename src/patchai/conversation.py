@@ -16,6 +16,8 @@ from collections.abc import AsyncIterator, Iterable
 from dataclasses import dataclass
 from typing import Any
 
+from patchai.channels.content import UserContent
+
 from langchain_core.messages import AIMessage, AIMessageChunk, ToolMessage
 
 _MAX_OUTPUT = 4000
@@ -74,24 +76,28 @@ class ToolFinished:
 Event = TextDelta | ReasoningDelta | ToolStarted | ToolInputDelta | ToolCalled | ToolFinished
 
 
-async def ask(agent: Any, thread_id: str, text: str) -> str:
-    """Append ``text`` to ``thread_id`` and return the assistant's text."""
+async def ask(agent: Any, thread_id: str, content: UserContent) -> str:
+    """Append ``content`` to ``thread_id`` and return the assistant's text."""
     parts = [
         event.text
-        async for event in stream_events(agent, thread_id, text)
+        async for event in stream_events(agent, thread_id, content)
         if isinstance(event, TextDelta)
     ]
     return "".join(parts)
 
 
-async def stream_events(agent: Any, thread_id: str, text: str) -> AsyncIterator[Event]:
-    """Yield text, reasoning and tool progress for one turn."""
+async def stream_events(agent: Any, thread_id: str, content: UserContent) -> AsyncIterator[Event]:
+    """Yield text, reasoning and tool progress for one turn.
+
+    ``content`` is the new user message. A string is a text turn. A list is
+    the multimodal content blocks Deep Agents reads on the user message.
+    """
     config = {"configurable": {"thread_id": thread_id}}
     earlier = await _earlier_calls(agent, config)
     open_calls: dict[tuple[tuple[str, ...], int], str] = {}
     announced: set[str] = set()
     async for chunk in agent.astream(
-        {"messages": [{"role": "user", "content": text}]},
+        {"messages": [{"role": "user", "content": content}]},
         config,
         stream_mode=["messages", "updates"],
         subgraphs=True,

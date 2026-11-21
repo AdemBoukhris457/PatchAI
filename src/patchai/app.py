@@ -7,6 +7,7 @@ import asyncio
 import importlib
 from pathlib import Path
 
+from patchai.channels.content import UserContent
 from patchai.channels.registry import resolve
 from patchai.config.env import load_env
 from patchai.config.loader import apply_model_choice, load_settings
@@ -35,13 +36,13 @@ async def main(config_path: Path | None = None) -> None:
     agent = build_agent(settings, root=root, mcp_tools=mcp_tools)
     channel = resolve(settings.channel)
 
-    async def on_message(session_id: str, user_id: str, text: str) -> str:
+    async def on_message(session_id: str, user_id: str, content: UserContent) -> str:
         del user_id
-        return await ask(agent, session_id, text)
+        return await ask(agent, session_id, content)
 
-    async def on_stream(session_id: str, user_id: str, text: str):
+    async def on_stream(session_id: str, user_id: str, content: UserContent):
         del user_id
-        async for event in stream_events(agent, session_id, text):
+        async for event in stream_events(agent, session_id, content):
             yield event
 
     if settings.channel == "web":

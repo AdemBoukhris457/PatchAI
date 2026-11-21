@@ -88,12 +88,62 @@ async def test_web_channel_streams_events_as_ui_message_parts() -> None:
     assert body.endswith("data: [DONE]\n\n")
 
 
-def _post(port: int, payload: dict[str, str]) -> tuple[int, str]:
+@pytest.mark.asyncio
+async def test_web_channel_passes_media_blocks_to_the_agent() -> None:
+    seen: list[object] = []
+
+    async def handler(session_id: str, user_id: str, content: object) -> str:
+        del session_id, user_id
+        seen.append(content)
+        return "a chart"
+
+    channel = WebChannel("127.0.0.1", 0)
+    task = asyncio.create_task(channel.serve(handler))
+    try:
+        for _ in range(50):
+            if channel.ready:
+                break
+            await asyncio.sleep(0.02)
+        else:
+            raise AssertionError("The web channel did not bind.")
+
+        status, body = await asyncio.to_thread(
+            _post,
+            channel.port,
+            {
+                "thread_id": "web",
+                "content": [
+                    {"type": "text", "text": "What is in this screenshot?"},
+                    {
+                        "type": "image",
+                        "base64": "aaaa",
+                        "mime_type": "image/png",
+                    },
+                ],
+            },
+        )
+    finally:
+        channel.close()
+        await task
+
+    assert status == 200
+    assert body == "a chart"
+    assert seen == [
+        [
+            {"type": "text", "text": "What is in this screenshot?"},
+            {"type": "image", "base64": "aaaa", "mime_type": "image/png"},
+        ]
+    ]
+
+
+def _post(port: int, payload: dict[str, object]) -> tuple[int, str]:
     status, body, _headers = _post_with_headers(port, payload)
     return status, body
 
 
-def _post_with_headers(port: int, payload: dict[str, str]) -> tuple[int, str, dict[str, str]]:
+def _post_with_headers(
+    port: int, payload: dict[str, object]
+) -> tuple[int, str, dict[str, str]]:
     request = urllib.request.Request(
         f"http://127.0.0.1:{port}/chat",
         data=json.dumps(payload).encode(),

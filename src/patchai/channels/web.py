@@ -14,12 +14,13 @@ from collections.abc import AsyncIterator, Awaitable, Callable, Coroutine
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from patchai.channels import ui_stream
+from patchai.channels.content import TurnError, UserContent, parse_turn
 from patchai.channels.registry import register
 from patchai.conversation import Event
 
-ReplyHandler = Callable[[str, str, str], Awaitable[str] | AsyncIterator[Event]]
+ReplyHandler = Callable[[str, str, UserContent], Awaitable[str] | AsyncIterator[Event]]
 
-_MAX_BODY = 1_000_000
+_MAX_BODY = 32_000_000
 
 
 class WebChannel:
@@ -130,15 +131,16 @@ def _chat_handler(
             if not isinstance(payload, dict):
                 _plain(self, 400, "The message could not be read.")
                 return
-            text = payload.get("text")
             thread_id = payload.get("thread_id", "web")
-            if not isinstance(text, str) or not text.strip():
-                _plain(self, 400, "A message is required.")
-                return
             if not isinstance(thread_id, str) or not thread_id.strip():
                 _plain(self, 400, "A thread id is required.")
                 return
-            result = handler(thread_id.strip(), "local", text.strip())
+            try:
+                content = parse_turn(payload)
+            except TurnError as exc:
+                _plain(self, 400, str(exc))
+                return
+            result = handler(thread_id.strip(), "local", content)
             if hasattr(result, "__aiter__"):
                 _stream(self, loop, result)
                 return
