@@ -50,6 +50,7 @@ import {
 } from "./downloads"
 import { AssistantPinnedList, NotraFavoriteGroup } from "./favorites"
 import { AssistantPdfCanvas } from "./viewers"
+import { AssistantModelMenu, NotraModelMenu } from "./model-pickers"
 import {
   AssistantRailSidebar,
   AssistantThreadSidebar,
@@ -370,6 +371,23 @@ const viewerOptions: Piece[] = [
   },
 ]
 
+const modelOptions: Piece[] = [
+  {
+    id: "model-notra-menu",
+    name: "Notra model menu",
+    library: "Notra UI",
+    note: "Gemini’s model chip. A ghost trigger opens a radio list above it. The check sits on the left, with the name and a short line under it. GPT-6 Luna starts selected.",
+    Mock: NotraModelMenu,
+  },
+  {
+    id: "model-aui-menu",
+    name: "assistant-ui model menu",
+    library: "assistant-ui",
+    note: "The composer model pill. The name and a chevron sit in the action row. The list opens above it, with a short line beside each name and a check on the current one. GPT-6 Luna starts selected.",
+    Mock: AssistantModelMenu,
+  },
+]
+
 const favoriteOptions: Piece[] = [
   {
     id: "fav-aui-pinned",
@@ -391,7 +409,7 @@ const shellNames = new Map(
   [...notraShells, ...assistantShells].map((shell) => [shell.id, shell.name]),
 )
 const pieceNames = new Map(
-  [...pieceOptions, ...warningOptions, ...themeOptions, ...sidebarOptions, ...downloadOptions, ...viewerOptions, ...favoriteOptions].map((piece) => [
+  [...pieceOptions, ...warningOptions, ...themeOptions, ...sidebarOptions, ...downloadOptions, ...viewerOptions, ...modelOptions, ...favoriteOptions].map((piece) => [
     piece.id,
     piece.name,
   ]),
@@ -446,7 +464,46 @@ export function Gallery() {
       </header>
 
       <main className="mx-auto max-w-6xl px-4 py-8">
-        <div className="mb-3 hidden grid-cols-2 gap-6 md:grid">
+        <section>
+          <h2 className="text-lg font-medium">The model menu</h2>
+          <p className="mt-1 max-w-2xl text-sm text-neutral-600">
+            Both sit where GPT-6 Luna is now. The list is the chat models OpenAI documents for this kind of conversation. Luna stays selected until you pick another.
+          </p>
+          <div className="mt-4 grid gap-4 md:grid-cols-2">
+            {modelOptions.map((piece) => {
+              const marked = pieces.includes(piece.id)
+              const Mock = piece.Mock
+              return (
+                <section
+                  key={piece.id}
+                  id={piece.id}
+                  className={`rounded-2xl border bg-white p-3 ${marked ? "border-neutral-950" : "border-neutral-200"}`}
+                >
+                  <div className="mb-3 flex items-start justify-between gap-2">
+                    <div>
+                      <h3 className="text-sm font-medium">{piece.name}</h3>
+                      <p className="text-xs text-neutral-500">{piece.library}</p>
+                    </div>
+                    <button
+                      type="button"
+                      aria-pressed={marked}
+                      onClick={() => togglePiece(piece.id)}
+                      className={`shrink-0 rounded-full px-2.5 py-1 text-xs outline-none focus-visible:ring-2 ${marked ? "bg-neutral-950 text-white" : "border"}`}
+                    >
+                      {marked ? "Marked" : "Mark"}
+                    </button>
+                  </div>
+                  <p className="mb-3 text-xs text-neutral-600">{piece.note}</p>
+                  <div className="overflow-hidden rounded-xl bg-neutral-100 px-4 pt-96 pb-4">
+                    <Mock />
+                  </div>
+                </section>
+              )
+            })}
+          </div>
+        </section>
+
+        <div className="mt-10 mb-3 hidden grid-cols-2 gap-6 md:grid">
           <h2 className="text-lg font-medium">Notra UI</h2>
           <h2 className="text-lg font-medium">assistant-ui</h2>
         </div>
