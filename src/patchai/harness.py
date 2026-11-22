@@ -20,6 +20,7 @@ from langgraph.graph.state import CompiledStateGraph
 from langgraph.store.memory import InMemoryStore
 
 from patchai.config.models import Settings
+from patchai.model_choice import RequestedModel
 from patchai.plugins.registry import load_enabled
 
 SYSTEM_PROMPT = (
@@ -99,6 +100,7 @@ def build_agent(
         skills=["/skills/"],
         backend=project_backend(project_root, store),
         store=store,
+        middleware=(RequestedModel(settings),),
         permissions=[_READ_ONLY],
         checkpointer=InMemorySaver(),
         name="patchai",

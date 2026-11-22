@@ -220,6 +220,93 @@ async def test_closing_the_stream_cancels_the_run() -> None:
     assert not continued.is_set()
 
 
+@pytest.mark.asyncio
+async def test_web_channel_passes_a_chosen_model() -> None:
+    seen: list[str | None] = []
+
+    async def handler(session_id: str, user_id: str, text: str, prior=None, model=None) -> str:
+        del session_id, user_id, text, prior
+        seen.append(model)
+        return "ok"
+
+    channel = WebChannel("127.0.0.1", 0)
+    task = asyncio.create_task(channel.serve(handler))
+    try:
+        for _ in range(50):
+            if channel.ready:
+                break
+            await asyncio.sleep(0.02)
+        else:
+            raise AssertionError("The web channel did not bind.")
+
+        status, body = await asyncio.to_thread(
+            _post,
+            channel.port,
+            {"thread_id": "web", "text": "hello", "model": "gpt-6.2-sol"},
+        )
+        refused, refused_body = await asyncio.to_thread(
+            _post,
+            channel.port,
+            {"thread_id": "web", "text": "hello", "model": "not-a-model"},
+        )
+    finally:
+        channel.close()
+        await task
+
+    assert status == 200
+    assert body == "ok"
+    assert seen == ["gpt-6.2-sol"]
+    assert refused == 400
+    assert refused_body == "That model is not available."
+
+
+@pytest.mark.asyncio
+async def test_web_channel_passes_a_chosen_effort() -> None:
+    seen: list[tuple[str | None, str | None]] = []
+
+    async def handler(
+        session_id: str,
+        user_id: str,
+        text: str,
+        prior=None,
+        model=None,
+        effort=None,
+    ) -> str:
+        del session_id, user_id, text, prior
+        seen.append((model, effort))
+        return "ok"
+
+    channel = WebChannel("127.0.0.1", 0)
+    task = asyncio.create_task(channel.serve(handler))
+    try:
+        for _ in range(50):
+            if channel.ready:
+                break
+            await asyncio.sleep(0.02)
+        else:
+            raise AssertionError("The web channel did not bind.")
+
+        status, body = await asyncio.to_thread(
+            _post,
+            channel.port,
+            {"thread_id": "web", "text": "hello", "model": "gpt-6-luna", "effort": "high"},
+        )
+        refused, refused_body = await asyncio.to_thread(
+            _post,
+            channel.port,
+            {"thread_id": "web", "text": "hello", "effort": "none"},
+        )
+    finally:
+        channel.close()
+        await task
+
+    assert status == 200
+    assert body == "ok"
+    assert seen == [("gpt-6-luna", "high")]
+    assert refused == 400
+    assert refused_body == "That effort is not available."
+
+
 def _read_then_close(port: int, marker: bytes) -> None:
     """Read until ``marker`` arrives, then hang up."""
     body = json.dumps({"thread_id": "web", "text": "hello"}).encode()

@@ -17,6 +17,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from patchai.channels.content import UserContent
+from patchai.model_choice import requested_effort, requested_model
 
 from langchain_core.messages import AIMessage, AIMessageChunk, RemoveMessage, ToolMessage
 from langgraph.graph.message import REMOVE_ALL_MESSAGES
@@ -100,6 +101,8 @@ async def stream_events(
     thread_id: str,
     content: UserContent,
     prior: Sequence[PriorLine] | None = None,
+    model: str | None = None,
+    effort: str | None = None,
 ) -> AsyncIterator[Event]:
     """Yield text, reasoning and tool progress for one turn.
 
@@ -108,7 +111,25 @@ async def stream_events(
     ``prior`` is the dialogue the page kept. When it is set, the turn forks
     from the checkpoint just before the edited message instead of appending
     onto the latest head.
+    ``model`` is a chat model id from the page. When it is set, that model
+    answers this turn. ``effort`` is that model's reasoning effort.
     """
+    choice = requested_model.set(model)
+    effort_choice = requested_effort.set(effort)
+    try:
+        async for event in _stream_turn(agent, thread_id, content, prior):
+            yield event
+    finally:
+        requested_effort.reset(effort_choice)
+        requested_model.reset(choice)
+
+
+async def _stream_turn(
+    agent: Any,
+    thread_id: str,
+    content: UserContent,
+    prior: Sequence[PriorLine] | None,
+) -> AsyncIterator[Event]:
     config = await _resume_config(agent, thread_id, prior)
     earlier = await _earlier_calls(agent, config)
     open_calls: dict[tuple[tuple[str, ...], int], str] = {}

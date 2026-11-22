@@ -40,9 +40,16 @@ async def main(config_path: Path | None = None) -> None:
         del user_id
         return await ask(agent, session_id, content)
 
-    async def on_stream(session_id: str, user_id: str, content: UserContent, prior=None):
+    async def on_stream(
+        session_id: str,
+        user_id: str,
+        content: UserContent,
+        prior=None,
+        model=None,
+        effort=None,
+    ):
         del user_id
-        async for event in stream_events(agent, session_id, content, prior):
+        async for event in stream_events(agent, session_id, content, prior, model, effort):
             yield event
 
     if settings.channel == "web":

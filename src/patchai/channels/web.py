@@ -9,10 +9,12 @@ happen. The process keeps the agent so a thread survives across requests.
 from __future__ import annotations
 
 import asyncio
+import inspect
 import json
 import select
 import socket
 from collections.abc import AsyncIterator, Awaitable, Callable, Coroutine
+from typing import cast
 from concurrent.futures import CancelledError as RunCancelled
 from concurrent.futures import Future
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -21,6 +23,7 @@ from patchai.channels import ui_stream
 from patchai.channels.content import TurnError, UserContent, parse_prior, parse_turn
 from patchai.channels.registry import register
 from patchai.conversation import Event
+from patchai.model_choice import CHAT_EFFORTS, CHAT_MODELS
 
 ReplyHandler = Callable[
     [str, str, UserContent, list[tuple[str, str]] | None],
@@ -205,10 +208,12 @@ def _chat_handler(
             try:
                 content = parse_turn(payload)
                 prior = parse_prior(payload)
+                model = _model_choice(payload)
+                effort = _effort_choice(payload)
             except TurnError as exc:
                 _plain(self, 400, str(exc))
                 return
-            result = handler(thread_id.strip(), "local", content, prior)
+            result = _call_handler(handler, thread_id.strip(), content, prior, model, effort)
             if hasattr(result, "__aiter__"):
                 _stream(self, loop, result)
                 return
@@ -227,6 +232,46 @@ def _chat_handler(
             return
 
     return ChatHandler
+
+
+def _model_choice(payload: dict[str, object]) -> str | None:
+    """The chat model named on this turn, when the page sent one."""
+    if "model" not in payload or payload["model"] is None:
+        return None
+    model = payload["model"]
+    if not isinstance(model, str) or model not in CHAT_MODELS:
+        raise TurnError("That model is not available.")
+    return model
+
+
+def _effort_choice(payload: dict[str, object]) -> str | None:
+    """The reasoning effort named on this turn, when the page sent one."""
+    if "effort" not in payload or payload["effort"] is None:
+        return None
+    effort = payload["effort"]
+    if not isinstance(effort, str) or effort not in CHAT_EFFORTS:
+        raise TurnError("That effort is not available.")
+    return effort
+
+
+def _call_handler(
+    handler: ReplyHandler,
+    thread_id: str,
+    content: UserContent,
+    prior,
+    model: str | None,
+    effort: str | None,
+):
+    """Pass ``model`` and ``effort`` only when the handler accepts them."""
+    call = cast(Callable[..., object], handler)
+    parameters = inspect.signature(handler).parameters
+    args: list[object] = [thread_id, "local", content, prior]
+    if "model" in parameters:
+        args.append(model)
+    kwargs: dict[str, object] = {}
+    if "effort" in parameters:
+        kwargs["effort"] = effort
+    return call(*args, **kwargs)
 
 
 channel = WebChannel()
