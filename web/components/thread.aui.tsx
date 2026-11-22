@@ -6,6 +6,7 @@ import {
   UserMessageAttachments,
 } from "@/components/attachment.aui";
 import { ChainOfThought, ReasoningTrace } from "@/components/chain-trace";
+import { ComposerModelMenu } from "@/components/composer-model";
 import {
   ComposerMenus,
   ComposerTriggerButtons,
@@ -512,7 +513,7 @@ const ComposerAction: FC = () => {
       <div className="aui-composer-action-start flex min-w-0 items-center">
         <ComposerAddAttachment />
         <ComposerTriggerButtons />
-        <span className="text-muted-foreground px-2 text-xs">GPT-6 Luna</span>
+        <ComposerModelMenu />
         {ComposerExtra ? <ComposerExtra /> : null}
       </div>
       <div className="ml-auto flex items-center gap-0.5">

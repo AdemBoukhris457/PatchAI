@@ -8,6 +8,7 @@ type IncomingMessage = {
 type Incoming = {
   id?: string
   messages?: IncomingMessage[]
+  config?: { modelName?: unknown; reasoningEffort?: unknown }
 }
 
 function lastUserIndex(messages: IncomingMessage[]) {
@@ -67,6 +68,10 @@ export async function POST(request: Request) {
       body: JSON.stringify({
         thread_id: threadId,
         prior: priorLines(body),
+        ...(typeof body.config?.modelName === "string" ? { model: body.config.modelName } : {}),
+        ...(typeof body.config?.reasoningEffort === "string"
+          ? { effort: body.config.reasoningEffort }
+          : {}),
         ...turn.body,
       }),
       signal: request.signal,
