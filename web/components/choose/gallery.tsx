@@ -49,6 +49,7 @@ import {
   NotraFileChip,
 } from "./downloads"
 import { AssistantPinnedList, NotraFavoriteGroup } from "./favorites"
+import { AssistantFileIndex, NotraFileIndex } from "./file-index"
 import { AssistantPdfCanvas } from "./viewers"
 import { AssistantModelMenu, NotraModelMenu } from "./model-pickers"
 import {
@@ -371,6 +372,23 @@ const viewerOptions: Piece[] = [
   },
 ]
 
+const fileIndexOptions: Piece[] = [
+  {
+    id: "files-aui-popover",
+    name: "assistant-ui file popover",
+    library: "assistant-ui",
+    note: "A header can read the thread. Output is what the chat made. Input is what you attached. Each row is an artifact card, and choosing one is this page’s job.",
+    Mock: AssistantFileIndex,
+  },
+  {
+    id: "files-notra-sheet",
+    name: "Notra file sheet",
+    library: "Notra UI",
+    note: "Notra has no file index. ChatGPT Activity is their sheet of item rows. Each row has a title and a second line, and the sheet comes in from the right.",
+    Mock: NotraFileIndex,
+  },
+]
+
 const modelOptions: Piece[] = [
   {
     id: "model-notra-menu",
@@ -409,7 +427,7 @@ const shellNames = new Map(
   [...notraShells, ...assistantShells].map((shell) => [shell.id, shell.name]),
 )
 const pieceNames = new Map(
-  [...pieceOptions, ...warningOptions, ...themeOptions, ...sidebarOptions, ...downloadOptions, ...viewerOptions, ...modelOptions, ...favoriteOptions].map((piece) => [
+  [...pieceOptions, ...warningOptions, ...themeOptions, ...sidebarOptions, ...downloadOptions, ...viewerOptions, ...fileIndexOptions, ...modelOptions, ...favoriteOptions].map((piece) => [
     piece.id,
     piece.name,
   ]),
@@ -465,6 +483,43 @@ export function Gallery() {
 
       <main className="mx-auto max-w-6xl px-4 py-8">
         <section>
+          <h2 className="text-lg font-medium">Files in this chat</h2>
+          <p className="mt-1 max-w-2xl text-sm text-neutral-600">
+            The corner control lists the files this conversation made. Open it, then pick a row. The chat uses the assistant-ui list.
+          </p>
+          <div className="mt-4 grid gap-4 md:grid-cols-2">
+            {fileIndexOptions.map((piece) => {
+              const marked = pieces.includes(piece.id)
+              const Mock = piece.Mock
+              return (
+                <section
+                  key={piece.id}
+                  id={piece.id}
+                  className={`rounded-2xl border bg-white p-3 ${marked ? "border-neutral-950" : "border-neutral-200"}`}
+                >
+                  <div className="mb-3 flex items-start justify-between gap-2">
+                    <div>
+                      <h3 className="text-sm font-medium">{piece.name}</h3>
+                      <p className="text-xs text-neutral-500">{piece.library}</p>
+                    </div>
+                    <button
+                      type="button"
+                      aria-pressed={marked}
+                      onClick={() => togglePiece(piece.id)}
+                      className={`shrink-0 rounded-full px-2.5 py-1 text-xs outline-none focus-visible:ring-2 ${marked ? "bg-neutral-950 text-white" : "border"}`}
+                    >
+                      {marked ? "Marked" : "Mark"}
+                    </button>
+                  </div>
+                  <p className="mb-3 text-xs text-neutral-600">{piece.note}</p>
+                  <Mock />
+                </section>
+              )
+            })}
+          </div>
+        </section>
+
+        <section className="mt-10">
           <h2 className="text-lg font-medium">The model menu</h2>
           <p className="mt-1 max-w-2xl text-sm text-neutral-600">
             Both sit where GPT-6 Luna is now. The list is the chat models OpenAI documents for this kind of conversation. Luna stays selected until you pick another.
