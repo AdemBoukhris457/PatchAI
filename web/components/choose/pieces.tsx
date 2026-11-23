@@ -206,7 +206,7 @@ export function SlashPiece() {
     <div className="relative">
       <input aria-label="Command" value={value} onChange={(event) => setValue(event.target.value)} className="w-full rounded-lg border px-2 py-1 text-sm outline-none" />
       <Menu open={value.startsWith("/")} className="top-full mt-1">
-        {["/time", "/search", "/remember"].map((item) => (
+        {["/search", "/remember"].map((item) => (
           <MenuItem key={item} onClick={() => setValue(`${item} `)}>{item}</MenuItem>
         ))}
       </Menu>

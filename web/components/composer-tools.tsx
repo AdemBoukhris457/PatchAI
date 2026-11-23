@@ -63,7 +63,6 @@ const mentionFormatter: DirectiveFormatter = {
 }
 
 const PROMPTS: Record<string, string> = {
-  time: "What time is it right now?",
   search: "Search for ",
   remember: "Remember this: ",
 }
@@ -168,14 +167,6 @@ export const ComposerMenus: FC = () => {
   const slash = unstable_useSlashCommandAdapter({
     removeOnExecute: true,
     commands: [
-      {
-        id: "time",
-        description: "Ask for the current time",
-        execute: () => {
-          const text = aui.composer().getState().text
-          aui.composer().setText(fillCommand(text, PROMPTS.time ?? ""))
-        },
-      },
       {
         id: "search",
         description: "Start a search",

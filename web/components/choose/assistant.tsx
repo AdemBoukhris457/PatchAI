@@ -123,7 +123,7 @@ export function UnifiedComposer() {
             ))
           : null}
         {showSlash || open === "slash"
-          ? ["/time", "/search", "/remember"].map((item) => (
+          ? ["/search", "/remember"].map((item) => (
               <MenuItem key={item} onClick={() => { draft.setValue(`${item} `); setOpen(null) }}>
                 {item}
               </MenuItem>
