@@ -12,6 +12,7 @@ from pathlib import Path
 
 from deepagents import FilesystemPermission, create_deep_agent
 from deepagents.backends import CompositeBackend, FilesystemBackend, StateBackend, StoreBackend
+from deepagents.backends.utils import create_file_data
 from langchain.chat_models import init_chat_model
 from langchain_core.language_models import BaseChatModel
 from langchain_core.tools import BaseTool
@@ -25,9 +26,38 @@ from patchai.plugins.registry import load_enabled
 
 SYSTEM_PROMPT = (
     "You are PatchAI, a helpful assistant. "
-    "When a user tells you a preference to remember, save it in "
-    "/memories/preferences.txt so a later conversation can read it."
+    "When a user tells you a preference to remember, update "
+    "/memories/preferences.md with the edit_file tool before you answer. "
+    "Leave /memory/AGENTS.md unchanged. "
+    "When a user asks you to use their saved preferences, follow "
+    "/memories/preferences.md. "
+    "When a user asks you to use a saved file, read a PDF with "
+    "read_pdf_source and a PowerPoint with read_pptx_source before you answer."
 )
+
+_LOCAL_USER = "local"
+_PREFERENCES_KEY = "/preferences.md"
+_PREFERENCES_SEED = "# Preferences\n"
+
+
+def memory_namespace(runtime: object) -> tuple[str, ...]:
+    """The user id that owns ``/memories/``.
+
+    Deep Agents scopes that route with
+    ``lambda rt: (rt.server_info.user.identity,)``. This process has one
+    local user. Use that identity when the runtime carries it, and
+    ``local`` when it does not.
+    """
+    try:
+        server = getattr(runtime, "server_info", None)
+        user = getattr(server, "user", None) if server is not None else None
+        identity = getattr(user, "identity", None) if user is not None else None
+    except AttributeError:
+        identity = None
+    if isinstance(identity, str) and identity:
+        return (identity,)
+    return (_LOCAL_USER,)
+
 
 _READ_ONLY = FilesystemPermission(
     operations=["write"],
@@ -50,7 +80,7 @@ def project_backend(root: Path, store: InMemoryStore) -> CompositeBackend:
             "/skills/": FilesystemBackend(root_dir=root / "skills", virtual_mode=True),
             "/memories/": StoreBackend(
                 store=store,
-                namespace=lambda _runtime: ("memories",),
+                namespace=memory_namespace,
             ),
         },
     )
@@ -90,13 +120,14 @@ def build_agent(
     """
     project_root = (root or Path.cwd()).resolve()
     store = InMemoryStore()
+    store.put((_LOCAL_USER,), _PREFERENCES_KEY, create_file_data(_PREFERENCES_SEED))
     tools = [tool for plugin in load_enabled(settings.plugins) for tool in plugin.tools()]
     tools.extend(mcp_tools)
     return create_deep_agent(
         model=model if model is not None else chat_model(settings),
         tools=tools,
         system_prompt=SYSTEM_PROMPT,
-        memory=["/memory/AGENTS.md"],
+        memory=["/memory/AGENTS.md", "/memories/preferences.md"],
         skills=["/skills/"],
         backend=project_backend(project_root, store),
         store=store,

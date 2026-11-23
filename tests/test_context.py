@@ -14,7 +14,7 @@ from langchain_core.messages import AIMessage
 from langgraph.store.memory import InMemoryStore
 
 from patchai.config.models import Settings
-from patchai.harness import SYSTEM_PROMPT, build_agent, project_backend
+from patchai.harness import SYSTEM_PROMPT, build_agent, memory_namespace, project_backend
 
 ROOT = Path(__file__).parents[1]
 
@@ -60,10 +60,29 @@ def test_project_memory_and_skills_are_on_disk_and_preferences_are_stored() -> N
     names = [entry["path"] for entry in listed.entries or []]
     assert any(path.rstrip("/").endswith("answer-time") for path in names)
 
-    written = backend.write("/memories/preferences.txt", "Keep answers short.")
+    written = backend.write("/memories/preferences.md", "Keep answers short.")
     assert written.error is None
-    stored = store.get(("memories",), "/preferences.txt")
+    stored = store.get(("local",), "/preferences.md")
     assert stored is not None
+    assert stored.value["content"] == "Keep answers short."
+
+
+def test_memory_namespace_uses_the_server_user_or_the_local_user() -> None:
+    class _User:
+        identity = "ada"
+
+    class _Server:
+        user = _User()
+
+    class _Runtime:
+        server_info = _Server()
+
+    class _Missing:
+        def __getattr__(self, name: str) -> object:
+            raise AttributeError(name)
+
+    assert memory_namespace(_Runtime()) == ("ada",)
+    assert memory_namespace(_Missing()) == ("local",)
 
 
 def test_system_prompt_loads_memory_and_skill_metadata_only() -> None:
@@ -97,6 +116,9 @@ def test_system_prompt_loads_memory_and_skill_metadata_only() -> None:
     assert seen
     prompt = seen[0]
     assert SYSTEM_PROMPT in prompt
+    assert "/memories/preferences.md" in prompt
+    assert "read_pdf_source" in prompt
+    assert "read_pptx_source" in prompt
     assert "Answer in plain text." in prompt
     assert "answer-time" in prompt
     assert "Report the current UTC time." in prompt
