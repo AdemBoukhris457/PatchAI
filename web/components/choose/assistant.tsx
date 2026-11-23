@@ -130,7 +130,7 @@ export function UnifiedComposer() {
             ))
           : null}
         {showMention || open === "mention"
-          ? ["@memory", "@thread", "@file"].map((item) => (
+          ? ["@memory", "@file"].map((item) => (
               <MenuItem key={item} onClick={() => { draft.setValue(`${draft.value}${item} `); setOpen(null) }}>
                 {item}
               </MenuItem>

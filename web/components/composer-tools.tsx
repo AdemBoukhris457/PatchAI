@@ -4,39 +4,35 @@ import {
   ComposerPrimitive,
   unstable_useMentionAdapter,
   unstable_useSlashCommandAdapter,
+  unstable_useTriggerPopoverScopeContext,
   useAui,
   useAuiState,
   type Unstable_Mention,
+  type Unstable_TriggerItem,
 } from "@assistant-ui/react"
 import type { DirectiveFormatter, DirectiveSegment } from "@assistant-ui/core"
 import { AtSignIcon, SlashIcon } from "lucide-react"
-import { type FC } from "react"
+import { useLayoutEffect, useMemo, useRef, type FC } from "react"
 
-const MENTIONS: readonly Unstable_Mention[] = [
-  {
-    id: "memory",
-    type: "mention",
-    label: "@memory",
-    description: "Saved memories",
-  },
-  {
-    id: "thread",
-    type: "mention",
-    label: "@thread",
-    description: "This conversation",
-  },
-  {
-    id: "file",
-    type: "mention",
-    label: "@file",
-    description: "A file in this thread",
-  },
-]
+import { fileRequest, threadFileKey, type ThreadFile } from "@/lib/thread-files"
 
-const MENTION_LABELS = MENTIONS.map((item) => item.label)
+const MEMORY: Unstable_Mention = {
+  id: "memory",
+  type: "mention",
+  label: "@memory",
+  description: "Saved memories",
+}
+
+const MENTION_LABELS = [MEMORY.label]
+
+const USE_SAVED_PREFERENCES = "Use my saved preferences."
 
 const mentionFormatter: DirectiveFormatter = {
-  serialize: (item) => item.label,
+  serialize: (item) => {
+    if (item.id === "memory") return USE_SAVED_PREFERENCES
+    if (item.type === "file") return fileRequest(item.label)
+    return item.label
+  },
   parse(text) {
     const segments: DirectiveSegment[] = []
     let rest = text
@@ -108,10 +104,67 @@ const menuItem =
   "hover:bg-muted data-highlighted:bg-muted flex w-full flex-col items-start rounded-lg px-2.5 py-1.5 text-left outline-none"
 
 const menu =
-  "bg-popover text-popover-foreground absolute bottom-full left-2 z-20 mb-2 w-56 overflow-hidden rounded-xl border p-1 shadow-md"
+  "bg-popover text-popover-foreground absolute bottom-full left-2 z-20 mb-2 max-h-64 w-56 overflow-y-auto rounded-xl border p-1 shadow-md"
+
+function ChooseMemoryImmediately() {
+  const { activeCategoryId, selectItem } = unstable_useTriggerPopoverScopeContext()
+  const chosen = useRef(false)
+  useLayoutEffect(() => {
+    if (activeCategoryId !== "memory") {
+      chosen.current = false
+      return
+    }
+    if (chosen.current) return
+    chosen.current = true
+    selectItem(MEMORY)
+  }, [activeCategoryId, selectItem])
+  return null
+}
+
+function MentionChoices({ items }: { items: readonly Unstable_TriggerItem[] }) {
+  const { activeCategoryId } = unstable_useTriggerPopoverScopeContext()
+  if (activeCategoryId === "memory") return null
+  if (items.length === 0) {
+    return (
+      <p className="text-muted-foreground px-2.5 py-1.5 text-xs">
+        No files in this conversation
+      </p>
+    )
+  }
+  return items.map((item, index) => (
+    <ComposerPrimitive.TriggerPopoverItem
+      key={item.id}
+      item={item}
+      index={index}
+      className={menuItem}
+    >
+      <span className="w-full truncate text-sm">{item.label}</span>
+      {item.description ? (
+        <span className="text-muted-foreground w-full truncate text-xs">
+          {item.description}
+        </span>
+      ) : null}
+    </ComposerPrimitive.TriggerPopoverItem>
+  ))
+}
+
+function fileMention(file: ThreadFile): Unstable_Mention {
+  const kind = file.kind === "pdf" ? "PDF" : "PowerPoint"
+  return {
+    id: file.filename,
+    type: "file",
+    label: file.filename,
+    description: file.title ? `${kind} · ${file.title}` : kind,
+  }
+}
 
 export const ComposerMenus: FC = () => {
   const aui = useAui()
+  const savedKey = useAuiState((state) => threadFileKey(state.thread.messages))
+  const files = useMemo(
+    () => (JSON.parse(savedKey) as ThreadFile[]).map(fileMention),
+    [savedKey],
+  )
   const slash = unstable_useSlashCommandAdapter({
     removeOnExecute: true,
     commands: [
@@ -142,7 +195,10 @@ export const ComposerMenus: FC = () => {
     ],
   })
   const mention = unstable_useMentionAdapter({
-    items: MENTIONS,
+    categories: [
+      { id: "memory", label: "@memory", items: [MEMORY] },
+      { id: "file", label: "@file", items: files },
+    ],
     includeModelContextTools: false,
     formatter: mentionFormatter,
   })
@@ -183,24 +239,30 @@ export const ComposerMenus: FC = () => {
         className={menu}
       >
         <ComposerPrimitive.TriggerPopover.Directive {...mention.directive} />
-        <ComposerPrimitive.TriggerPopoverItems>
-          {(items) =>
-            items.map((item, index) => (
-              <ComposerPrimitive.TriggerPopoverItem
-                key={item.id}
-                item={item}
-                index={index}
+        <ChooseMemoryImmediately />
+        <ComposerPrimitive.TriggerPopoverCategories>
+          {(categories) =>
+            categories.map((category) => (
+              <ComposerPrimitive.TriggerPopoverCategoryItem
+                key={category.id}
+                categoryId={category.id}
                 className={menuItem}
               >
-                <span className="text-sm">{item.label}</span>
-                {item.description ? (
-                  <span className="text-muted-foreground text-xs">
-                    {item.description}
-                  </span>
-                ) : null}
-              </ComposerPrimitive.TriggerPopoverItem>
+                <span className="text-sm">{category.label}</span>
+                <span className="text-muted-foreground text-xs">
+                  {category.id === "memory"
+                    ? "Saved memories"
+                    : "A file in this thread"}
+                </span>
+              </ComposerPrimitive.TriggerPopoverCategoryItem>
             ))
           }
+        </ComposerPrimitive.TriggerPopoverCategories>
+        <ComposerPrimitive.TriggerPopoverBack className="text-muted-foreground hover:bg-muted w-full rounded-lg px-2.5 py-1.5 text-left text-xs">
+          Back
+        </ComposerPrimitive.TriggerPopoverBack>
+        <ComposerPrimitive.TriggerPopoverItems>
+          {(items) => <MentionChoices items={items} />}
         </ComposerPrimitive.TriggerPopoverItems>
       </ComposerPrimitive.TriggerPopover>
     </>

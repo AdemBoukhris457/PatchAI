@@ -192,7 +192,7 @@ export function MentionPiece() {
     <div className="relative">
       <input aria-label="Mention" value={value} onChange={(event) => setValue(event.target.value)} className="w-full rounded-lg border px-2 py-1 text-sm outline-none" />
       <Menu open={open} className="top-full mt-1">
-        {["@memory", "@thread", "@file"].map((item) => (
+        {["@memory", "@file"].map((item) => (
           <MenuItem key={item} onClick={() => setValue(`${value.split("@")[0]}${item} `)}>{item}</MenuItem>
         ))}
       </Menu>
