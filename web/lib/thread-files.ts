@@ -35,6 +35,32 @@ export function threadFileKey(messages: readonly ThreadMessage[]) {
   return JSON.stringify(threadFiles(messages))
 }
 
+export type ThreadInput = {
+  id: string
+  name: string
+  kind: string
+  href: string | null
+}
+
+export function threadInputs(messages: readonly ThreadMessage[]): ThreadInput[] {
+  const saved = new Map<string, ThreadInput>()
+  for (const message of messages) {
+    if (message.role !== "user") continue
+    for (const attachment of message.attachments) {
+      if (attachment.status.type !== "complete") continue
+      const name = attachment.name.trim()
+      if (!name) continue
+      saved.set(name, {
+        id: attachment.id,
+        name,
+        kind: inputKind(name, attachment.contentType, attachment.type),
+        href: hrefOf(attachment.content),
+      })
+    }
+  }
+  return [...saved.values()]
+}
+
 function fileFrom(part: ThreadMessage["content"][number]): ThreadFile | null {
   if (part.type !== "tool-call" || part.isError || part.isPreliminary) return null
   if (!FILE_TOOLS.has(part.toolName)) return null
@@ -60,6 +86,22 @@ function recordOf(result: unknown) {
   const value = typeof result === "string" ? parseJson(result) : result
   if (!value || typeof value !== "object") return null
   return value as { filename?: unknown; title?: unknown }
+}
+
+function inputKind(name: string, contentType: string | undefined, type: string) {
+  if (type === "image") return "Image"
+  const extension = name.split(".").pop()?.toLowerCase() ?? ""
+  if (extension === "pdf" || contentType === "application/pdf") return "PDF"
+  if (extension === "ppt" || extension === "pptx") return "PowerPoint"
+  return "File"
+}
+
+function hrefOf(content: readonly { type: string }[]) {
+  for (const part of content) {
+    if (part.type === "file" && "data" in part && typeof part.data === "string") return part.data
+    if (part.type === "image" && "image" in part && typeof part.image === "string") return part.image
+  }
+  return null
 }
 
 function parseJson(text: string): unknown {

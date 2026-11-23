@@ -15,6 +15,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { ChatSidebar } from "@/components/chat-sidebar"
 import { PdfPreviewPanel, PdfPreviewProvider } from "@/components/pdf-preview"
 import { Thread } from "@/components/thread.aui"
+import { ThreadFileMenu } from "@/components/thread-file-menu"
 import { UnsupportedFileNotice } from "@/components/unsupported-file"
 import { acceptedAttachmentAdapter } from "@/lib/attachment-adapter"
 import {
@@ -81,11 +82,18 @@ function ChatThread({
     <AssistantRuntimeProvider runtime={runtime}>
       <PdfPreviewProvider>
         <UnsupportedFileNotice />
-        <div className="relative flex min-h-0 w-full flex-1">
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-            <Thread />
+        <div className="flex min-h-0 w-full flex-1 flex-col">
+          <header className="flex h-14 shrink-0 items-center gap-2 px-3">
+            <SidebarTrigger />
+            <h1 className="text-sm font-medium">PatchAI</h1>
+            <ThreadFileMenu />
+          </header>
+          <div className="relative flex min-h-0 w-full flex-1">
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+              <Thread />
+            </div>
+            <PdfPreviewPanel />
           </div>
-          <PdfPreviewPanel />
         </div>
       </PdfPreviewProvider>
     </AssistantRuntimeProvider>
@@ -233,10 +241,6 @@ export function ChatScreen() {
         onPin={pinChat}
       />
       <SidebarInset className="min-h-0">
-        <header className="flex h-14 shrink-0 items-center gap-2 px-3">
-          <SidebarTrigger />
-          <h1 className="text-sm font-medium">PatchAI</h1>
-        </header>
         {active ? (
           <ChatThread
             key={active.id}
@@ -245,7 +249,13 @@ export function ChatScreen() {
             onMessages={remember}
           />
         ) : (
-          <div className="flex flex-1" />
+          <>
+            <header className="flex h-14 shrink-0 items-center gap-2 px-3">
+              <SidebarTrigger />
+              <h1 className="text-sm font-medium">PatchAI</h1>
+            </header>
+            <div className="flex flex-1" />
+          </>
         )}
       </SidebarInset>
     </SidebarProvider>
