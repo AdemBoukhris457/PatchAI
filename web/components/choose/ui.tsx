@@ -200,7 +200,7 @@ export function Menu({
   if (!open) return null
   return (
     <div
-      className={`absolute z-30 min-w-44 rounded-xl border border-neutral-200 bg-white p-1 text-left text-sm text-neutral-900 shadow-lg ${className}`}
+      className={`absolute z-30 min-w-44 rounded-[6px] border border-neutral-200 bg-white p-1 text-left text-sm text-neutral-900 shadow-lg ${className}`}
     >
       {children}
     </div>
@@ -220,7 +220,7 @@ export function MenuItem({
     <button
       type="button"
       onClick={onClick}
-      className={`flex w-full items-center rounded-lg px-2 py-1.5 text-left outline-none hover:bg-neutral-100 focus-visible:bg-neutral-100 ${muted ? "text-neutral-400" : ""}`}
+      className={`flex w-full items-center rounded-[4px] px-2 py-1.5 text-left outline-none hover:bg-neutral-100 focus-visible:bg-neutral-100 ${muted ? "text-neutral-400" : ""}`}
     >
       {children}
     </button>

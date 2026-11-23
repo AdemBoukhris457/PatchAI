@@ -101,10 +101,10 @@ function focusComposer(expected: string) {
 }
 
 const menuItem =
-  "hover:bg-muted data-highlighted:bg-muted flex w-full flex-col items-start rounded-lg px-2.5 py-1.5 text-left outline-none"
+  "hover:bg-muted data-highlighted:bg-muted flex w-full flex-col items-start rounded-[4px] px-2.5 py-1.5 text-left outline-none"
 
 const menu =
-  "bg-popover text-popover-foreground absolute bottom-full left-2 z-20 mb-2 max-h-64 w-56 overflow-y-auto rounded-xl border p-1 shadow-md"
+  "bg-popover text-popover-foreground absolute bottom-full left-2 z-20 mb-2 max-h-64 w-56 overflow-y-auto rounded-[6px] border p-1 shadow-md"
 
 function ChooseMemoryImmediately() {
   const { activeCategoryId, selectItem } = unstable_useTriggerPopoverScopeContext()
@@ -258,7 +258,7 @@ export const ComposerMenus: FC = () => {
             ))
           }
         </ComposerPrimitive.TriggerPopoverCategories>
-        <ComposerPrimitive.TriggerPopoverBack className="text-muted-foreground hover:bg-muted w-full rounded-lg px-2.5 py-1.5 text-left text-xs">
+        <ComposerPrimitive.TriggerPopoverBack className="text-muted-foreground hover:bg-muted w-full rounded-[4px] px-2.5 py-1.5 text-left text-xs">
           Back
         </ComposerPrimitive.TriggerPopoverBack>
         <ComposerPrimitive.TriggerPopoverItems>

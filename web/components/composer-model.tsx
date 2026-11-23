@@ -84,7 +84,7 @@ export function ComposerModelMenu() {
             id={modelListId}
             role="listbox"
             aria-label="Models"
-            className="bg-popover text-popover-foreground absolute bottom-full left-0 z-30 mb-2 w-72 rounded-xl border p-1 shadow-md"
+            className="bg-popover text-popover-foreground absolute bottom-full left-0 z-30 mb-2 w-72 rounded-[6px] border p-1 shadow-md"
           >
             {CHAT_MODELS.map((item) => {
               const selected = item.id === model.id
@@ -95,7 +95,7 @@ export function ComposerModelMenu() {
                   role="option"
                   aria-selected={selected}
                   onClick={() => chooseModel(item.id)}
-                  className="hover:bg-muted data-highlighted:bg-muted flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left outline-none focus-visible:bg-muted"
+                  className="hover:bg-muted data-highlighted:bg-muted flex w-full items-center gap-2 rounded-[4px] px-2.5 py-1.5 text-left outline-none focus-visible:bg-muted"
                 >
                   <span className="min-w-0 flex-1 text-sm">{item.name}</span>
                   <span className="text-muted-foreground text-xs">{item.detail}</span>
@@ -126,7 +126,7 @@ export function ComposerModelMenu() {
             id={effortListId}
             role="listbox"
             aria-label="Thinking effort"
-            className="bg-popover text-popover-foreground absolute bottom-full left-0 z-30 mb-2 w-56 rounded-xl border p-1 shadow-md"
+            className="bg-popover text-popover-foreground absolute bottom-full left-0 z-30 mb-2 w-56 rounded-[6px] border p-1 shadow-md"
           >
             {REASONING_EFFORTS.map((item) => {
               const selected = item.id === effort.id
@@ -137,7 +137,7 @@ export function ComposerModelMenu() {
                   role="option"
                   aria-selected={selected}
                   onClick={() => chooseEffort(item.id)}
-                  className="hover:bg-muted data-highlighted:bg-muted flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left outline-none focus-visible:bg-muted"
+                  className="hover:bg-muted data-highlighted:bg-muted flex w-full items-center gap-2 rounded-[4px] px-2.5 py-1.5 text-left outline-none focus-visible:bg-muted"
                 >
                   <span className="min-w-0 flex-1 text-sm">{item.name}</span>
                   <span className="text-muted-foreground text-xs">{item.detail}</span>
