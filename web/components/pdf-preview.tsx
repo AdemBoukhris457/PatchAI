@@ -13,6 +13,7 @@ import {
 import type { PDFDocumentProxy, RenderTask } from "pdfjs-dist"
 
 import { DeckCanvas } from "@/components/deck-preview"
+import { MarkdownCanvas } from "@/components/markdown-preview"
 import { ghostButton } from "@/components/surfaces"
 import { cn } from "@/lib/utils"
 
@@ -60,6 +61,9 @@ export function PdfPreviewPanel() {
   if (!preview?.document) return null
   if (preview.document.filename.endsWith(".pptx")) {
     return <DeckCanvas document={preview.document} onClose={preview.close} />
+  }
+  if (preview.document.filename.endsWith(".md")) {
+    return <MarkdownCanvas document={preview.document} onClose={preview.close} />
   }
   return <PdfCanvas document={preview.document} onClose={preview.close} />
 }

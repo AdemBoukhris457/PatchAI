@@ -95,7 +95,7 @@ export function ThreadFileMenu() {
                 <FileChoice
                   key={file.filename}
                   title={file.title ?? file.filename}
-                  detail={`${file.kind === "pptx" ? "PowerPoint" : "PDF"} · ${file.filename}`}
+                  detail={`${file.kind === "pptx" ? "PowerPoint" : file.kind === "md" ? "Markdown" : "PDF"} · ${file.filename}`}
                   source="output"
                   kind={file.kind}
                   selected={preview?.document?.filename === file.filename}

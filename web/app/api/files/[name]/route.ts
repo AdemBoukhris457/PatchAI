@@ -4,9 +4,10 @@ import path from "node:path"
 const TYPES: Record<string, string> = {
   pdf: "application/pdf",
   pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  md: "text/markdown; charset=utf-8",
 }
 
-const FILE_NAME = /^[a-z0-9][a-z0-9_-]{0,70}\.(pdf|pptx)$/
+const FILE_NAME = /^[a-z0-9][a-z0-9_-]{0,70}\.(pdf|pptx|md)$/
 
 export async function GET(
   _request: Request,

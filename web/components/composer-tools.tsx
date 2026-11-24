@@ -148,7 +148,7 @@ function MentionChoices({ items }: { items: readonly Unstable_TriggerItem[] }) {
 }
 
 function fileMention(file: ThreadFile): Unstable_Mention {
-  const kind = file.kind === "pdf" ? "PDF" : "PowerPoint"
+  const kind = file.kind === "pdf" ? "PDF" : file.kind === "md" ? "Markdown" : "PowerPoint"
   return {
     id: file.filename,
     type: "file",

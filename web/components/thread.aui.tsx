@@ -14,6 +14,7 @@ import {
 } from "@/components/composer-tools";
 import { File, getFileHref } from "@/components/file";
 import { DeckArtifact } from "@/components/deck-card";
+import { MarkdownArtifact } from "@/components/markdown-card";
 import { PdfArtifact } from "@/components/pdf-card";
 import { ReportArtifact } from "@/components/report-card";
 import { ThreadFollowupSuggestions } from "@/components/follow-up-suggestions.aui";
@@ -118,6 +119,7 @@ const groupedMessage = groupPartByType({
 
 const PDF_TOOLS = new Set(["create_pdf", "update_pdf"]);
 const DECK_TOOLS = new Set(["create_pptx", "update_pptx"]);
+const MARKDOWN_TOOLS = new Set(["create_markdown", "update_markdown"]);
 const REPORT_TOOLS = new Set(["render_spec"]);
 
 const messageGroupBy: typeof groupedMessage = (part, context) => {
@@ -125,6 +127,7 @@ const messageGroupBy: typeof groupedMessage = (part, context) => {
     part.type === "tool-call" &&
     (PDF_TOOLS.has(part.toolName) ||
       DECK_TOOLS.has(part.toolName) ||
+      MARKDOWN_TOOLS.has(part.toolName) ||
       REPORT_TOOLS.has(part.toolName))
   ) {
     return [];
@@ -710,6 +713,16 @@ const AssistantMessage: FC = () => {
                 if (DECK_TOOLS.has(part.toolName)) {
                   return (
                     <DeckArtifact
+                      argsText={part.argsText}
+                      result={part.result}
+                      status={part.status}
+                      isError={part.isError}
+                    />
+                  );
+                }
+                if (MARKDOWN_TOOLS.has(part.toolName)) {
+                  return (
+                    <MarkdownArtifact
                       argsText={part.argsText}
                       result={part.result}
                       status={part.status}
