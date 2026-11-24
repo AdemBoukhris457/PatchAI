@@ -242,14 +242,44 @@ function neutralize(data) {
   }
 }
 
+function forceWhiteBackground(palette, index) {
+  let whiteAt = palette.findIndex(([r, g, b]) => r > 250 && g > 250 && b > 250)
+  if (whiteAt < 0) whiteAt = 0
+  palette[whiteAt] = [255, 255, 255]
+  if (whiteAt === 0) return
+  const previous = palette[0]
+  palette[0] = palette[whiteAt]
+  palette[whiteAt] = previous
+  for (let i = 0; i < index.length; i += 1) {
+    if (index[i] === 0) index[i] = whiteAt
+    else if (index[i] === whiteAt) index[i] = 0
+  }
+}
+
+function pinNeutrals(palette) {
+  for (const color of palette) {
+    const [r, g, b] = color
+    const max = Math.max(r, g, b)
+    const min = Math.min(r, g, b)
+    if (min > 210 && max - min < 28) {
+      const value = max >= 250 ? 255 : Math.round((r + g + b) / 3)
+      color[0] = value
+      color[1] = value
+      color[2] = value
+    }
+  }
+}
+
 function writeGif(path, frames) {
   const gif = GIFEncoder()
   for (const frame of frames) {
     const png = PNG.sync.read(frame.png)
     neutralize(png.data)
     const palette = quantize(png.data, 256)
+    pinNeutrals(palette)
     const index = applyPalette(png.data, palette, "rgb444")
-    gif.writeFrame(index, png.width, png.height, { palette, delay: frame.delay })
+    forceWhiteBackground(palette, index)
+    gif.writeFrame(index, png.width, png.height, { palette, delay: frame.delay, dispose: 1 })
   }
   gif.finish()
   writeFileSync(path, Buffer.from(gif.bytes()))
