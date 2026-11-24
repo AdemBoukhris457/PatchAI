@@ -7,14 +7,16 @@ const FILE_TOOLS = new Set([
   "update_pptx",
   "create_markdown",
   "update_markdown",
+  "create_docx",
+  "update_docx",
 ])
 
-const FILE_NAME = /^[a-z0-9][a-z0-9_-]{0,70}\.(pdf|pptx|md)$/
+const FILE_NAME = /^[a-z0-9][a-z0-9_-]{0,70}\.(pdf|pptx|md|docx)$/
 
 export type ThreadFile = {
   filename: string
   title: string | null
-  kind: "pdf" | "pptx" | "md"
+  kind: "pdf" | "pptx" | "md" | "docx"
 }
 
 export function fileRequest(filename: string) {
@@ -70,7 +72,13 @@ function fileFrom(part: ThreadMessage["content"][number]): ThreadFile | null {
   if (!record) return null
   const filename = record.filename
   if (typeof filename !== "string" || !FILE_NAME.test(filename)) return null
-  const kind = filename.endsWith(".pptx") ? "pptx" : filename.endsWith(".md") ? "md" : "pdf"
+  const kind = filename.endsWith(".pptx")
+    ? "pptx"
+    : filename.endsWith(".md")
+      ? "md"
+      : filename.endsWith(".docx")
+        ? "docx"
+        : "pdf"
   const title = textOf(record.title) ?? textOf(argsTitle(part))
   return { filename, title, kind }
 }

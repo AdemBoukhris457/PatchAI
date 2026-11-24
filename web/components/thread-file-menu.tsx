@@ -1,6 +1,6 @@
 "use client"
 
-import { FileText, LayoutDashboard, Paperclip, Presentation } from "lucide-react"
+import { FileText, FileType, LayoutDashboard, Paperclip, Presentation } from "lucide-react"
 import { useAuiState } from "@assistant-ui/react"
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 
@@ -95,7 +95,7 @@ export function ThreadFileMenu() {
                 <FileChoice
                   key={file.filename}
                   title={file.title ?? file.filename}
-                  detail={`${file.kind === "pptx" ? "PowerPoint" : file.kind === "md" ? "Markdown" : "PDF"} · ${file.filename}`}
+                  detail={`${kindLabel(file.kind)} · ${file.filename}`}
                   source="output"
                   kind={file.kind}
                   selected={preview?.document?.filename === file.filename}
@@ -127,6 +127,13 @@ export function ThreadFileMenu() {
   )
 }
 
+function kindLabel(kind: ThreadFile["kind"]) {
+  if (kind === "pptx") return "PowerPoint"
+  if (kind === "md") return "Markdown"
+  if (kind === "docx") return "Word"
+  return "PDF"
+}
+
 function FileGroup({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div>
@@ -154,7 +161,15 @@ function FileChoice({
   onPick: () => void
 }) {
   const Icon =
-    source === "input" ? Paperclip : kind === "pptx" ? Presentation : kind === "report" ? LayoutDashboard : FileText
+    source === "input"
+      ? Paperclip
+      : kind === "pptx"
+        ? Presentation
+        : kind === "report"
+          ? LayoutDashboard
+          : kind === "docx"
+            ? FileType
+            : FileText
   return (
     <button
       type="button"
