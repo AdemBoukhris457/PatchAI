@@ -24,6 +24,7 @@ def test_repository_settings_load() -> None:
         "pdf_report",
         "pptx_deck",
         "markdown_doc",
+        "word_doc",
         "report",
     )
     assert settings.mcp_config == "mcp.json"
