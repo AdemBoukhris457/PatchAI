@@ -30,13 +30,13 @@ The web chat is at <http://localhost:3000>. The agent listens at <http://127.0.0
 
 - Stream a reply, and pick a model and a reasoning effort in the composer.
 - Open an interactive report beside the thread, with text, figures, tables, charts, and diagrams. A control in the report updates the figures without another model call.
-- Create and revise a PDF or a PowerPoint. Files land in `exports/`, and the thread shows a card for each one.
+- Create and revise a PDF, a PowerPoint, or a Markdown file. Files land in `exports/`, and the thread shows a card for each one.
 - List what this thread holds. Output is what the assistant made. Input is what you attached.
 - Answer the time, look up US flood-insurance claims, and call the servers in `mcp.json`.
 
 ## Quick start
 
-You need Python 3.11 or newer, Node.js 22, and an API key for the model. The default model is `openai:gpt-6-luna`. PDF and PowerPoint are on in `config.toml`, so the matching extras are part of a normal install. Interactive reports also need the Node packages in `web/`.
+You need Python 3.11 or newer, Node.js 22, and an API key for the model. The default model is `openai:gpt-6-luna`. PDF, PowerPoint, and Markdown are on in `config.toml`, so the matching extras are part of a normal install. Interactive reports also need the Node packages in `web/`.
 
 From the repository root:
 
@@ -48,7 +48,7 @@ Windows:
 
 ```powershell
 .\.venv\Scripts\Activate.ps1
-pip install -e ".[pdf,pptx]"
+pip install -e ".[pdf,pptx,md]"
 copy .env.example .env
 ```
 
@@ -56,7 +56,7 @@ macOS and Linux:
 
 ```bash
 source .venv/bin/activate
-pip install -e ".[pdf,pptx]"
+pip install -e ".[pdf,pptx,md]"
 cp .env.example .env
 ```
 
@@ -122,7 +122,7 @@ active = "cli"
 python -m patchai
 ```
 
-Each line is one turn. A blank line ends the session. The CLI prints the finished reply. The browser is what draws reports, PDFs, and decks.
+Each line is one turn. A blank line ends the session. The CLI prints the finished reply. The browser is what draws reports, PDFs, decks, and Markdown files.
 
 ## Configuration
 
@@ -136,7 +136,7 @@ active = "web"
 name = "openai:gpt-6-luna"
 
 [plugins]
-enabled = ["example_clock", "openfema_flood", "pdf_report", "pptx_deck", "report"]
+enabled = ["example_clock", "openfema_flood", "pdf_report", "pptx_deck", "markdown_doc", "report"]
 
 [mcp]
 config = "mcp.json"
@@ -167,10 +167,10 @@ The web page and the terminal are channels. Each one hands the turn to the same 
 | `web/` | The Next.js chat |
 | `skills/` | Procedures the agent reads when a task needs them |
 | `memory/AGENTS.md` | Standing instructions for the agent |
-| `exports/` | PDFs and PowerPoints. Gitignored |
+| `exports/` | PDFs, PowerPoints, and Markdown files. Gitignored |
 | `.env` | Secrets and `PATCHAI_MODEL`. Gitignored |
 
-Chats stay in the browser. The agent process keeps the thread, saved preferences, and in-progress report specs in memory, so those are gone when the process exits. A PDF or PowerPoint in `exports/` stays on disk.
+Chats stay in the browser. The agent process keeps the thread, saved preferences, and in-progress report specs in memory, so those are gone when the process exits. A PDF, PowerPoint, or Markdown file in `exports/` stays on disk.
 
 ## Plugins
 
@@ -182,6 +182,7 @@ A plugin is a module at `src/patchai/plugins/<name>.py`, or a package of that na
 | `openfema_flood` | US NFIP flood-claim counts from the public OpenFEMA API |
 | `pdf_report` | Create, read, and update a PDF |
 | `pptx_deck` | Create, read, and update a PowerPoint |
+| `markdown_doc` | Create, read, and update a Markdown file |
 | `report` | An interactive report rendered in the web chat |
 
 `report` checks the spec with `web/scripts/render-spec.mjs`, so `npm install` inside `web/` has to have been run.
@@ -189,7 +190,7 @@ A plugin is a module at `src/patchai/plugins/<name>.py`, or a package of that na
 ## Tests
 
 ```bash
-pip install -e ".[dev,pdf,pptx]"
+pip install -e ".[dev,pdf,pptx,md]"
 pytest
 ```
 
