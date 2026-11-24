@@ -9,7 +9,8 @@
     "start": "next start",
     "lint": "eslint",
     "format": "prettier --write \"**/*.{ts,tsx}\"",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "capture": "node scripts/capture-live.mjs"
   },
   "dependencies": {
     "@ai-sdk/react": "^4.0.178",
@@ -58,6 +59,9 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.4.5",
+    "gifenc": "^1.0.3",
+    "playwright": "^1.58.2",
+    "pngjs": "^7.0.0",
     "prettier": "^3.9.10",
     "prettier-plugin-tailwindcss": "^0.8.1",
     "tailwindcss": "^4",
