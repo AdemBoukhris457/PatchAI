@@ -9,7 +9,7 @@ use_responses_api = true
 reasoning = { summary = "auto" }
 
 [plugins]
-enabled = ["example_clock", "openfema_flood", "pdf_report", "pptx_deck", "report"]
+enabled = ["example_clock", "openfema_flood", "pdf_report", "pptx_deck", "markdown_doc", "report"]
 
 [mcp]
 config = "mcp.json"

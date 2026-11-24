@@ -32,10 +32,16 @@ SYSTEM_PROMPT = (
     "When a user asks you to use their saved preferences, follow "
     "/memories/preferences.md. "
     "When a user asks you to use a saved file, read a PDF with "
-    "read_pdf_source and a PowerPoint with read_pptx_source before you answer. "
+    "read_pdf_source, a PowerPoint with read_pptx_source, and a Markdown "
+    "file with read_markdown_source before you answer. "
     "When a user asks for an interactive report or a dashboard, follow the "
     "render-spec skill and call render_spec. Use create_pdf only when they "
-    "ask for a PDF or a file to download."
+    "ask for a PDF or a file to download. "
+    "When a user asks for a Markdown file, a .md note, or a document to keep "
+    "as Markdown, follow the write-markdown skill and call create_markdown. "
+    "A change to a Markdown file this agent already created uses "
+    "update_markdown. write_file and edit_file do not publish that document, "
+    "and the chat will not show it."
 )
 
 _LOCAL_USER = "local"
