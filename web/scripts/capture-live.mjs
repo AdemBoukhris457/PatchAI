@@ -226,17 +226,18 @@ async function scrollTo(page, scroller, frames, locator) {
   }
 }
 
-function deepen(data) {
+function neutralize(data) {
   for (let i = 0; i < data.length; i += 4) {
     const r = data[i]
     const g = data[i + 1]
     const b = data[i + 2]
     const max = Math.max(r, g, b)
     const min = Math.min(r, g, b)
-    if (max > 120 && max < 210 && max - min < 24) {
-      data[i] = Math.round(r * 0.62)
-      data[i + 1] = Math.round(g * 0.62)
-      data[i + 2] = Math.round(b * 0.62)
+    if (min > 210 && max - min < 28) {
+      const value = max >= 250 ? 255 : Math.round((r + g + b) / 3)
+      data[i] = value
+      data[i + 1] = value
+      data[i + 2] = value
     }
   }
 }
@@ -245,7 +246,7 @@ function writeGif(path, frames) {
   const gif = GIFEncoder()
   for (const frame of frames) {
     const png = PNG.sync.read(frame.png)
-    deepen(png.data)
+    neutralize(png.data)
     const palette = quantize(png.data, 256)
     const index = applyPalette(png.data, palette, "rgb444")
     gif.writeFrame(index, png.width, png.height, { palette, delay: frame.delay })
