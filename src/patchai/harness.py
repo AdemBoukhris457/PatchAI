@@ -32,7 +32,10 @@ SYSTEM_PROMPT = (
     "When a user asks you to use their saved preferences, follow "
     "/memories/preferences.md. "
     "When a user asks you to use a saved file, read a PDF with "
-    "read_pdf_source and a PowerPoint with read_pptx_source before you answer."
+    "read_pdf_source and a PowerPoint with read_pptx_source before you answer. "
+    "When a user asks for an interactive report or a dashboard, follow the "
+    "render-spec skill and call render_spec. Use create_pdf only when they "
+    "ask for a PDF or a file to download."
 )
 
 _LOCAL_USER = "local"

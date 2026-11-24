@@ -18,7 +18,13 @@ def test_repository_settings_load() -> None:
 
     assert settings.channel == "web"
     assert settings.model == "openai:gpt-6-luna"
-    assert settings.plugins == ("example_clock", "openfema_flood", "pdf_report", "pptx_deck")
+    assert settings.plugins == (
+        "example_clock",
+        "openfema_flood",
+        "pdf_report",
+        "pptx_deck",
+        "report",
+    )
     assert settings.mcp_config == "mcp.json"
     assert settings.model_options == {
         "openai": {"use_responses_api": True, "reasoning": {"summary": "auto"}}
