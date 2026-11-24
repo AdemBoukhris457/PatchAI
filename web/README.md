@@ -1,21 +1,10 @@
-# Next.js template
+# Web
 
-This is a Next.js template with shadcn/ui.
-
-## Adding components
-
-To add components to your app, run the following command:
+The Next.js chat for PatchAI. Setup, configuration, and how the agent fits in are in the [repository README](../README.md).
 
 ```bash
-npx shadcn@latest add button
+npm install
+npm run dev
 ```
 
-This will place the ui components in the `components` directory.
-
-## Using components
-
-To use the components in your app, import them as follows:
-
-```tsx
-import { Button } from "@/components/ui/button";
-```
+The page is at <http://localhost:3000>. It sends each turn to the agent started with `python -m patchai`.
