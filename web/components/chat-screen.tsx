@@ -14,6 +14,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 
 import { ChatSidebar } from "@/components/chat-sidebar"
 import { PdfPreviewPanel, PdfPreviewProvider } from "@/components/pdf-preview"
+import { ReportPreviewPanel, ReportPreviewProvider } from "@/components/report-preview"
 import { Thread } from "@/components/thread.aui"
 import { ThreadFileMenu } from "@/components/thread-file-menu"
 import { UnsupportedFileNotice } from "@/components/unsupported-file"
@@ -81,20 +82,23 @@ function ChatThread({
   return (
     <AssistantRuntimeProvider runtime={runtime}>
       <PdfPreviewProvider>
-        <UnsupportedFileNotice />
-        <div className="flex min-h-0 w-full flex-1 flex-col">
-          <header className="flex h-14 shrink-0 items-center gap-2 px-3">
-            <SidebarTrigger />
-            <h1 className="text-sm font-medium">PatchAI</h1>
-            <ThreadFileMenu />
-          </header>
-          <div className="relative flex min-h-0 w-full flex-1">
-            <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-              <Thread />
+        <ReportPreviewProvider>
+          <UnsupportedFileNotice />
+          <div className="flex min-h-0 w-full flex-1 flex-col">
+            <header className="flex h-14 shrink-0 items-center gap-2 px-3">
+              <SidebarTrigger />
+              <h1 className="text-sm font-medium">PatchAI</h1>
+              <ThreadFileMenu />
+            </header>
+            <div className="relative flex min-h-0 w-full flex-1">
+              <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+                <Thread />
+              </div>
+              <PdfPreviewPanel />
+              <ReportPreviewPanel />
             </div>
-            <PdfPreviewPanel />
           </div>
-        </div>
+        </ReportPreviewProvider>
       </PdfPreviewProvider>
     </AssistantRuntimeProvider>
   )

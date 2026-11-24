@@ -15,6 +15,7 @@ import {
 import { File, getFileHref } from "@/components/file";
 import { DeckArtifact } from "@/components/deck-card";
 import { PdfArtifact } from "@/components/pdf-card";
+import { ReportArtifact } from "@/components/report-card";
 import { ThreadFollowupSuggestions } from "@/components/follow-up-suggestions.aui";
 import { Image } from "@/components/image";
 import { normalizeMath } from "@/lib/math";
@@ -117,9 +118,15 @@ const groupedMessage = groupPartByType({
 
 const PDF_TOOLS = new Set(["create_pdf", "update_pdf"]);
 const DECK_TOOLS = new Set(["create_pptx", "update_pptx"]);
+const REPORT_TOOLS = new Set(["render_spec"]);
 
 const messageGroupBy: typeof groupedMessage = (part, context) => {
-  if (part.type === "tool-call" && (PDF_TOOLS.has(part.toolName) || DECK_TOOLS.has(part.toolName))) {
+  if (
+    part.type === "tool-call" &&
+    (PDF_TOOLS.has(part.toolName) ||
+      DECK_TOOLS.has(part.toolName) ||
+      REPORT_TOOLS.has(part.toolName))
+  ) {
     return [];
   }
   return groupedMessage(part, context);
@@ -703,6 +710,16 @@ const AssistantMessage: FC = () => {
                 if (DECK_TOOLS.has(part.toolName)) {
                   return (
                     <DeckArtifact
+                      argsText={part.argsText}
+                      result={part.result}
+                      status={part.status}
+                      isError={part.isError}
+                    />
+                  );
+                }
+                if (REPORT_TOOLS.has(part.toolName)) {
+                  return (
+                    <ReportArtifact
                       argsText={part.argsText}
                       result={part.result}
                       status={part.status}

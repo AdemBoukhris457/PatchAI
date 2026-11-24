@@ -4,6 +4,7 @@ import { ArrowUpRight, Presentation } from "lucide-react"
 import type { ToolCallMessagePartProps } from "@assistant-ui/react"
 
 import { usePdfPreview } from "@/components/pdf-preview"
+import { useReportPreview } from "@/components/report-preview"
 import { mono, paper, ShimmerLabel } from "@/components/surfaces"
 import { cn } from "@/lib/utils"
 
@@ -36,9 +37,15 @@ export function DeckArtifact({
       ? "The PowerPoint could not be built"
       : "PowerPoint"
   const preview = usePdfPreview()
+  const reports = useReportPreview()
   const href = saved && !preview ? `/api/files/${encodeURIComponent(saved.filename)}` : undefined
   const onOpen =
-    saved && preview ? () => preview.open({ filename: saved.filename, title }) : undefined
+    saved && preview
+      ? () => {
+          reports?.close()
+          preview.open({ filename: saved.filename, title })
+        }
+      : undefined
   const className = cn(
     paper,
     "group flex w-full max-w-xs items-center gap-3 rounded-[20px] p-3.5 text-left transition-transform duration-150",

@@ -4,6 +4,7 @@ import { ArrowUpRight, FileText } from "lucide-react"
 import type { ToolCallMessagePartProps } from "@assistant-ui/react"
 
 import { usePdfPreview } from "@/components/pdf-preview"
+import { useReportPreview } from "@/components/report-preview"
 import { mono, paper, ShimmerLabel } from "@/components/surfaces"
 import { cn } from "@/lib/utils"
 
@@ -104,6 +105,7 @@ export function PdfArtifact({
   const saved = generating ? null : readSaved(result)
   const failed = !generating && saved === null && (isError || typeof result === "string")
   const preview = usePdfPreview()
+  const reports = useReportPreview()
   const title = titleOf(argsText) ?? saved?.title ?? stemOf(argsText) ?? "Document"
   const pages = saved?.pages
   const meta = saved
@@ -128,7 +130,10 @@ export function PdfArtifact({
         active={preview?.document?.filename === saved?.filename}
         onOpen={
           saved && preview
-            ? () => preview.open({ filename: saved.filename, title })
+            ? () => {
+                reports?.close()
+                preview.open({ filename: saved.filename, title })
+              }
             : undefined
         }
       />

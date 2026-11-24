@@ -1,20 +1,24 @@
 "use client"
 
-import { FileText, Paperclip, Presentation } from "lucide-react"
+import { FileText, LayoutDashboard, Paperclip, Presentation } from "lucide-react"
 import { useAuiState } from "@assistant-ui/react"
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 
 import { usePdfPreview } from "@/components/pdf-preview"
+import { useReportPreview } from "@/components/report-preview"
+import { threadReports, type ReportRecord } from "@/lib/report"
 import { threadFiles, threadInputs, type ThreadFile, type ThreadInput } from "@/lib/thread-files"
 
 export function ThreadFileMenu() {
   const root = useRef<HTMLDivElement>(null)
   const preview = usePdfPreview()
+  const reports = useReportPreview()
   const [open, setOpen] = useState(false)
   const messages = useAuiState((state) => state.thread.messages)
   const outputs = useMemo(() => threadFiles(messages), [messages])
+  const reportList = useMemo(() => threadReports(messages), [messages])
   const inputs = useMemo(() => threadInputs(messages), [messages])
-  const count = outputs.length + inputs.length
+  const count = outputs.length + reportList.length + inputs.length
 
   useEffect(() => {
     if (!open) return
@@ -36,7 +40,14 @@ export function ThreadFileMenu() {
 
   function openOutput(file: ThreadFile) {
     setOpen(false)
+    reports?.close()
     preview?.open({ filename: file.filename, title: file.title ?? file.filename })
+  }
+
+  function openReport(report: ReportRecord) {
+    setOpen(false)
+    preview?.close()
+    reports?.open(report)
   }
 
   function openInput(file: ThreadInput) {
@@ -67,8 +78,19 @@ export function ThreadFileMenu() {
           aria-label="Files"
           className="bg-popover text-popover-foreground absolute top-full right-0 z-30 mt-1 max-h-64 w-64 overflow-y-auto rounded-[6px] border p-1 shadow-md"
         >
-          {outputs.length > 0 ? (
+          {outputs.length > 0 || reportList.length > 0 ? (
             <FileGroup label="Output">
+              {reportList.map((report) => (
+                <FileChoice
+                  key={report.id}
+                  title={report.title}
+                  detail="Report"
+                  source="output"
+                  kind="report"
+                  selected={reports?.report?.id === report.id}
+                  onPick={() => openReport(report)}
+                />
+              ))}
               {outputs.map((file) => (
                 <FileChoice
                   key={file.filename}
@@ -82,7 +104,7 @@ export function ThreadFileMenu() {
               ))}
             </FileGroup>
           ) : null}
-          {outputs.length > 0 && inputs.length > 0 ? (
+          {(outputs.length > 0 || reportList.length > 0) && inputs.length > 0 ? (
             <div className="bg-foreground/10 -mx-1 my-1 h-px" />
           ) : null}
           {inputs.length > 0 ? (
@@ -127,11 +149,12 @@ function FileChoice({
   title: string
   detail: string
   source: "output" | "input"
-  kind?: ThreadFile["kind"]
+  kind?: ThreadFile["kind"] | "report"
   selected: boolean
   onPick: () => void
 }) {
-  const Icon = source === "input" ? Paperclip : kind === "pptx" ? Presentation : FileText
+  const Icon =
+    source === "input" ? Paperclip : kind === "pptx" ? Presentation : kind === "report" ? LayoutDashboard : FileText
   return (
     <button
       type="button"
