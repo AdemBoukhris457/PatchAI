@@ -25,6 +25,7 @@ pdf = ["typst>=0.15,<0.16", "matplotlib>=3.8"]
 pptx = ["python-pptx>=1.0.2,<2"]
 md = ["mdutils>=1.6,<2"]
 docx = ["python-docx>=1.1.2,<2"]
+search = ["ddgs>=9.16,<10"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

@@ -26,6 +26,7 @@ def test_repository_settings_load() -> None:
         "markdown_doc",
         "word_doc",
         "report",
+        "web_search",
     )
     assert settings.mcp_config == "mcp.json"
     assert settings.model_options == {

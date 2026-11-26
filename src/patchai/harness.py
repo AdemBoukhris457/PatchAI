@@ -50,7 +50,10 @@ SYSTEM_PROMPT = (
     "When a user asks to present, or for a slide deck, follow the write-pptx "
     "skill and call create_pptx. When they ask to turn a saved document into "
     "a deck, read that file's source first and then call create_pptx, with "
-    "the document's sentences in the slide notes."
+    "the document's sentences in the slide notes. "
+    "When a user asks for a current public fact that no other tool covers, "
+    "follow the web-search skill. Call search_web, then read_web_page on the "
+    "page you will cite."
 )
 
 _LOCAL_USER = "local"
