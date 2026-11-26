@@ -19,8 +19,8 @@ class _Slide(BaseModel):
 
     notes: str | None = Field(
         default=None,
-        max_length=500,
-        description="What the speaker says. This stays in the notes, off the slide.",
+        max_length=2_000,
+        description="What the speaker says. This stays in the notes, off the slide. When the deck comes from a document, put the supporting sentences here.",
     )
 
 

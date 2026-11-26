@@ -33,8 +33,17 @@ When the user asks to change a PowerPoint this agent created:
 - Use `chart` when the shape of the numbers matters: `line` for change over time, `bar` to compare categories, `pie` for one series as shares of a whole. The caption states the finding. Pass `source` on a chart or a table when you know where the numbers come from.
 - Use `comparison` for two sides, `columns` for two short explanations, `timeline` for steps in order, and `table` when the reader needs the exact cells.
 - Use `statement` for one claim that needs a sentence under it. Use `bullets` for at most five short lines. Use `quote` rarely.
-- Put what the speaker says in `notes`. Keep the slide itself short enough to read across a room.
+- Put what the speaker says in `notes`. Keep the slide itself short enough to read across a room: one headline and at most five short lines.
 - Keep one `accent` for the whole deck.
+
+## From a document
+
+When the user asks to present a saved brief, report, PDF, Word file, or Markdown note, or to turn that file into a deck:
+
+1. Read it first: `read_pdf_source`, `read_docx_source`, or `read_markdown_source`, using the saved filename.
+2. Pull one claim out of each section. That claim is the slide title, written as a sentence.
+3. Leave the document's sentences in `notes` for that slide. The slide shows the claim, a few numbers, or a short list. It does not repeat the paragraph.
+4. Call `create_pptx` once. A brief someone will read stays a document. This path is for a deck they will present.
 
 ## Done when
 
