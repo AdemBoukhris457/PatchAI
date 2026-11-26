@@ -32,7 +32,7 @@ The web chat is at <http://localhost:3000>. The agent listens at <http://127.0.0
 - Open an interactive report beside the thread, with text, figures, tables, charts, and diagrams. A control in the report updates the figures without another model call.
 - Create and revise a PDF, a PowerPoint, a Markdown file, or a Word document. Files land in `exports/`, and the thread shows a card for each one.
 - List what this thread holds. Output is what the assistant made. Input is what you attached.
-- Answer the time, look up US flood-insurance claims, and call the servers in `mcp.json`.
+- Answer the time, look up US flood-insurance claims, search the public web, and call the servers in `mcp.json`.
 
 ## Quick start
 
@@ -48,7 +48,7 @@ Windows:
 
 ```powershell
 .\.venv\Scripts\Activate.ps1
-pip install -e ".[pdf,pptx,md,docx]"
+pip install -e ".[pdf,pptx,md,docx,search]"
 copy .env.example .env
 ```
 
@@ -56,7 +56,7 @@ macOS and Linux:
 
 ```bash
 source .venv/bin/activate
-pip install -e ".[pdf,pptx,md,docx]"
+pip install -e ".[pdf,pptx,md,docx,search]"
 cp .env.example .env
 ```
 
@@ -136,7 +136,7 @@ active = "web"
 name = "openai:gpt-6-luna"
 
 [plugins]
-enabled = ["example_clock", "openfema_flood", "pdf_report", "pptx_deck", "markdown_doc", "word_doc", "report"]
+enabled = ["example_clock", "openfema_flood", "pdf_report", "pptx_deck", "markdown_doc", "word_doc", "report", "web_search"]
 
 [mcp]
 config = "mcp.json"
@@ -185,13 +185,14 @@ A plugin is a module at `src/patchai/plugins/<name>.py`, or a package of that na
 | `markdown_doc` | Create, read, and update a Markdown file |
 | `word_doc` | Create, read, and update a Word document |
 | `report` | An interactive report rendered in the web chat |
+| `web_search` | Search the public web and read a page. Needs the `search` extra |
 
 `report` checks the spec with `web/scripts/render-spec.mjs`, so `npm install` inside `web/` has to have been run.
 
 ## Tests
 
 ```bash
-pip install -e ".[dev,pdf,pptx,md,docx]"
+pip install -e ".[dev,pdf,pptx,md,docx,search]"
 pytest
 ```
 
