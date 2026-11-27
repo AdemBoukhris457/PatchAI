@@ -8,7 +8,6 @@ import {
 import { ChainOfThought, ReasoningTrace } from "@/components/chain-trace";
 import { ComposerModelMenu } from "@/components/composer-model";
 import { ComposerResearchToggle } from "@/components/composer-research";
-import { ResearchActivity } from "@/components/research-activity";
 import {
   ComposerMenus,
   ComposerTriggerButtons,
@@ -633,7 +632,8 @@ const AnswerText: FC = () => {
     <StreamdownTextPrimitive
       caret="circle"
       plugins={answerPlugins}
-      preprocess={normalizeMath}
+      components={answerComponents}
+      preprocess={prepareAnswer}
       animated={running ? answerMotion : false}
       className="[&>*:first-child]:mt-0 [&>*:last-child]:mb-0"
     />

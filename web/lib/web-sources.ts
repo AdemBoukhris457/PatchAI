@@ -140,7 +140,7 @@ function jsonString(value: string): string | null {
 }
 
 /** One identity for a page, ignoring a trailing slash and a fragment. */
-function sourceKey(url: string): string | null {
+export function sourceKey(url: string): string | null {
   let parsed: URL
   try {
     parsed = new URL(url.trim())
