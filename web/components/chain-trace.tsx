@@ -9,7 +9,7 @@ import {
   CollapsibleRoot,
   CollapsibleTrigger,
 } from "@/components/collapsible-root"
-import { toolLabel, workSummary } from "@/lib/tool-labels"
+import { stepName, toolLabel, workSummary } from "@/lib/tool-labels"
 import { cn } from "@/lib/utils"
 
 const FOLD_MS = 250
@@ -27,7 +27,12 @@ function headingFrom(text: string) {
 
 function isTool(
   part: PartState | undefined,
-): part is PartState & { type: "tool-call"; toolName: string; isError?: boolean } {
+): part is PartState & {
+  type: "tool-call"
+  toolName: string
+  args?: unknown
+  isError?: boolean
+} {
   return part?.type === "tool-call"
 }
 
@@ -39,7 +44,7 @@ function liveLabel(parts: readonly (PartState | undefined)[]) {
   for (let index = parts.length - 1; index >= 0; index -= 1) {
     const part = parts[index]
     if (isTool(part) && part.status.type === "running") {
-      return toolLabel(part.toolName, false)
+      return toolLabel(stepName(part.toolName, part.args), false)
     }
   }
   for (let index = parts.length - 1; index >= 0; index -= 1) {
@@ -58,7 +63,7 @@ function doneLabel(parts: readonly (PartState | undefined)[]) {
   const work = workSummary(
     tools
       .filter((part) => !failed(part) && part.status.type === "complete")
-      .map((part) => toolLabel(part.toolName, true)),
+      .map((part) => toolLabel(stepName(part.toolName, part.args), true)),
   )
   if (work && failures > 0) return `${work} · ${failures} failed`
   if (work) return work
@@ -182,16 +187,23 @@ export function ChainOfThought({
   const done = useAuiState((state) =>
     doneLabel(group.indices.map((index) => state.message.parts[index])),
   )
+  const research = useAuiState((state) =>
+    state.message.parts.some(
+      (part) => isTool(part) && stepName(part.toolName, part.args) === "research",
+    ),
+  )
   const working = group.status.type === "running"
-  const [open, setOpen] = useState(working)
+  const [open, setOpen] = useState(working && !research)
   const [seenWorking, setSeenWorking] = useState(working)
+  const [seenResearch, setSeenResearch] = useState(research)
   const [seconds, setSeconds] = useState<number | null>(null)
   const rootRef = useRef<HTMLDivElement>(null)
   const lockScroll = useScrollLock(rootRef, FOLD_MS)
 
-  if (seenWorking !== working) {
+  if (seenWorking !== working || seenResearch !== research) {
     setSeenWorking(working)
-    setOpen(working)
+    setSeenResearch(research)
+    setOpen(working && !research)
   }
 
   useEffect(() => {
@@ -202,7 +214,13 @@ export function ChainOfThought({
     }
   }, [working])
 
-  const label = working ? live : finishedLine(done, seconds)
+  const label = research
+    ? open
+      ? "Hide steps"
+      : "Show steps"
+    : working
+      ? live
+      : finishedLine(done, seconds)
   const waiting = working && label === "Working"
 
   return (
@@ -227,7 +245,7 @@ export function ChainOfThought({
         <span
           className={cn(
             "min-w-0 leading-snug",
-            working && "shimmer motion-reduce:animate-none",
+            working && !research && "shimmer motion-reduce:animate-none",
           )}
         >
           {label}

@@ -1,6 +1,9 @@
 const LABELS: Record<string, { running: string; done: string; plain?: string }> = {
   write_todos: { running: "Planning", done: "Made a plan" },
   task: { running: "Working with a helper agent", done: "Helper agent finished" },
+  search_web: { running: "Searching the web", done: "Searched the web", plain: "the web" },
+  read_web_page: { running: "Reading a page", done: "Read a page", plain: "the page" },
+  research: { running: "Researching", done: "Researched", plain: "the research" },
   ls: { running: "Listing files", done: "Listed files" },
   read_file: { running: "Reading a file", done: "Read a file" },
   write_file: { running: "Saving a file", done: "Saved a file" },
@@ -17,6 +20,14 @@ const LABELS: Record<string, { running: string; done: string; plain?: string }> 
     done: "Read the deck",
     plain: "the deck",
   },
+}
+
+/** The label key for a step: a `task` sent to the research worker reads as research. */
+export function stepName(toolName: string, args?: unknown) {
+  if (toolName !== "task" || !args || typeof args !== "object") return toolName
+  return (args as { subagent_type?: unknown }).subagent_type === "research-agent"
+    ? "research"
+    : toolName
 }
 
 function humanize(name: string) {
@@ -62,6 +73,12 @@ function repeated(label: string, count: number) {
   }
   if (label === "Read a file") {
     return `Read ${count} files`
+  }
+  if (label === "Read a page") {
+    return `Read ${count} pages`
+  }
+  if (label === "Researched") {
+    return `Researched ${count} topics`
   }
   return `${label} ${count} times`
 }

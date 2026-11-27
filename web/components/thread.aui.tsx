@@ -8,6 +8,7 @@ import {
 import { ChainOfThought, ReasoningTrace } from "@/components/chain-trace";
 import { ComposerModelMenu } from "@/components/composer-model";
 import { ComposerResearchToggle } from "@/components/composer-research";
+import { ResearchActivity } from "@/components/research-activity";
 import {
   ComposerMenus,
   ComposerTriggerButtons,
@@ -673,6 +674,7 @@ const AssistantMessage: FC = () => {
         data-slot="aui_assistant-message-content"
         className="text-foreground px-2 leading-relaxed wrap-break-word"
       >
+        <ResearchActivity />
         <MessagePrimitive.GroupedParts groupBy={groupBy} indicator="empty">
           {({ part, children }) => {
             switch (part.type) {

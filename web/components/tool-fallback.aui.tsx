@@ -30,7 +30,7 @@ import {
   type ToolCallMessagePartStatus,
   type ToolCallMessagePartComponent,
 } from "@assistant-ui/react";
-import { toolPhrase } from "@/lib/tool-labels";
+import { stepName, toolPhrase } from "@/lib/tool-labels";
 import { cn } from "@/lib/utils";
 import {
   CollapsibleRoot as Collapsible,
@@ -1206,6 +1206,7 @@ function ToolFallbackApprovalImpl({
 
 const ToolFallbackImpl: ToolCallMessagePartComponent = ({
   toolName,
+  args,
   argsText,
   result,
   isError,
@@ -1260,7 +1261,7 @@ const ToolFallbackImpl: ToolCallMessagePartComponent = ({
   return (
     <ToolFallbackRoot open={open} onOpenChange={setOpen}>
       <ToolFallbackTrigger
-        toolName={toolName}
+        toolName={stepName(toolName, args)}
         status={status}
         isError={isError}
         responseDeliveryStatus={responseDeliveryStatus}
