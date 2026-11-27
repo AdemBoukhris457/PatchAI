@@ -8,7 +8,7 @@ type IncomingMessage = {
 type Incoming = {
   id?: string
   messages?: IncomingMessage[]
-  config?: { modelName?: unknown; reasoningEffort?: unknown }
+  config?: { modelName?: unknown; reasoningEffort?: unknown; research?: unknown }
 }
 
 function lastUserIndex(messages: IncomingMessage[]) {
@@ -72,6 +72,7 @@ export async function POST(request: Request) {
         ...(typeof body.config?.reasoningEffort === "string"
           ? { effort: body.config.reasoningEffort }
           : {}),
+        ...(body.config?.research === true ? { research: true } : {}),
         ...turn.body,
       }),
       signal: request.signal,

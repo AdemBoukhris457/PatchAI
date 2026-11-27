@@ -14,6 +14,7 @@ import type { DirectiveFormatter, DirectiveSegment } from "@assistant-ui/core"
 import { AtSignIcon, SlashIcon } from "lucide-react"
 import { useLayoutEffect, useMemo, useRef, type FC } from "react"
 
+import { setResearchMode } from "@/lib/research-mode"
 import { fileRequest, threadFileKey, type ThreadFile } from "@/lib/thread-files"
 
 const MEMORY: Unstable_Mention = {
@@ -189,6 +190,11 @@ export const ComposerMenus: FC = () => {
           const text = aui.composer().getState().text
           aui.composer().setText(fillCommand(text, PROMPTS.remember ?? ""))
         },
+      },
+      {
+        id: "research",
+        description: "Turn on research mode",
+        execute: () => setResearchMode(true),
       },
     ],
   })

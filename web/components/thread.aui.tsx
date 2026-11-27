@@ -7,6 +7,7 @@ import {
 } from "@/components/attachment.aui";
 import { ChainOfThought, ReasoningTrace } from "@/components/chain-trace";
 import { ComposerModelMenu } from "@/components/composer-model";
+import { ComposerResearchToggle } from "@/components/composer-research";
 import {
   ComposerMenus,
   ComposerTriggerButtons,
@@ -528,6 +529,7 @@ const ComposerAction: FC = () => {
         <ComposerAddAttachment />
         <ComposerTriggerButtons />
         <ComposerModelMenu />
+        <ComposerResearchToggle />
         {ComposerExtra ? <ComposerExtra /> : null}
       </div>
       <div className="ml-auto flex items-center gap-0.5">
