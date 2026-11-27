@@ -174,7 +174,13 @@ class _Blocks:
 
 
 def _origin(subagent: bool) -> dict[str, object]:
-    return {"toolMetadata": {"subagent": True}} if subagent else {}
+    if not subagent:
+        return {}
+    # assistant-ui keeps providerMetadata on a tool part and drops toolMetadata.
+    return {
+        "toolMetadata": {"subagent": True},
+        "providerMetadata": {"patchai": {"subagent": True}},
+    }
 
 
 def _search_titles(output: str) -> dict[str, str]:

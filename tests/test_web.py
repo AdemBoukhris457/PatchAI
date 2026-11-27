@@ -307,6 +307,52 @@ async def test_web_channel_passes_a_chosen_effort() -> None:
     assert refused_body == "That effort is not available."
 
 
+@pytest.mark.asyncio
+async def test_web_channel_passes_research_mode() -> None:
+    seen: list[bool] = []
+
+    async def handler(
+        session_id: str,
+        user_id: str,
+        text: str,
+        prior=None,
+        model=None,
+        effort=None,
+        research=False,
+    ) -> str:
+        del session_id, user_id, text, prior, model, effort
+        seen.append(research)
+        return "ok"
+
+    channel = WebChannel("127.0.0.1", 0)
+    task = asyncio.create_task(channel.serve(handler))
+    try:
+        for _ in range(50):
+            if channel.ready:
+                break
+            await asyncio.sleep(0.02)
+        else:
+            raise AssertionError("The web channel did not bind.")
+
+        on, _ = await asyncio.to_thread(
+            _post, channel.port, {"thread_id": "web", "text": "hello", "research": True}
+        )
+        off, _ = await asyncio.to_thread(
+            _post, channel.port, {"thread_id": "web", "text": "hello"}
+        )
+        refused, refused_body = await asyncio.to_thread(
+            _post, channel.port, {"thread_id": "web", "text": "hello", "research": "yes"}
+        )
+    finally:
+        channel.close()
+        await task
+
+    assert (on, off) == (200, 200)
+    assert seen == [True, False]
+    assert refused == 400
+    assert refused_body == "Research must be on or off."
+
+
 def _read_then_close(port: int, marker: bytes) -> None:
     """Read until ``marker`` arrives, then hang up."""
     body = json.dumps({"thread_id": "web", "text": "hello"}).encode()

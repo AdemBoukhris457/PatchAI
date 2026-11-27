@@ -47,9 +47,12 @@ async def main(config_path: Path | None = None) -> None:
         prior=None,
         model=None,
         effort=None,
+        research=False,
     ):
         del user_id
-        async for event in stream_events(agent, session_id, content, prior, model, effort):
+        async for event in stream_events(
+            agent, session_id, content, prior, model, effort, research
+        ):
             yield event
 
     if settings.channel == "web":

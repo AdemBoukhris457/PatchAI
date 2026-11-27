@@ -79,6 +79,7 @@ async def test_reasoning_errors_and_subagents_are_marked() -> None:
         {"type": "reasoning-end", "id": "reasoning-1"},
     ]
     assert parts[4]["toolMetadata"] == {"subagent": True}
+    assert parts[4]["providerMetadata"] == {"patchai": {"subagent": True}}
     assert parts[5] == {
         "type": "tool-output-error",
         "toolCallId": "c2",
@@ -189,6 +190,30 @@ async def test_a_read_page_is_still_listed_when_the_reply_fails() -> None:
         {"type": "error", "errorText": "PatchAI could not finish this reply."},
         {"type": "finish"},
     ]
+
+
+@pytest.mark.asyncio
+async def test_a_page_a_research_worker_read_is_listed() -> None:
+    page = json.dumps({
+        "url": "https://www.rust-lang.org/",
+        "text": "Rust 1.95",
+        "truncated": False,
+    })
+    parts = await _parts([
+        ToolStarted("t", "task", False),
+        ToolCalled("t", "task", {"subagent_type": "research-agent", "description": "Rust"}, False),
+        ToolStarted("r", "read_web_page", True),
+        ToolFinished("r", page, False),
+        ToolFinished("t", "Findings: Rust 1.95", False),
+        TextDelta("Rust 1.95 [1](https://www.rust-lang.org/)."),
+    ])
+
+    assert parts[-2] == {
+        "type": "source-url",
+        "sourceId": "https://www.rust-lang.org/",
+        "url": "https://www.rust-lang.org/",
+        "title": "rust-lang.org",
+    }
 
 
 @pytest.mark.asyncio

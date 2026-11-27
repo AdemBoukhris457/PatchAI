@@ -23,6 +23,7 @@ from langgraph.store.memory import InMemoryStore
 from patchai.config.models import Settings
 from patchai.model_choice import RequestedModel
 from patchai.plugins.registry import load_enabled
+from patchai.research import ResearchMode, lead_limits, research_subagent
 
 SYSTEM_PROMPT = (
     "You are PatchAI, a helpful assistant. "
@@ -53,7 +54,10 @@ SYSTEM_PROMPT = (
     "the document's sentences in the slide notes. "
     "When a user asks for a current public fact that no other tool covers, "
     "follow the web-search skill. Call search_web, then read_web_page on the "
-    "page you will cite."
+    "page you will cite. "
+    "When a user asks for research, a deep dive, a comparison across sources, "
+    "or a report from the web, follow the deep-research skill and send the "
+    "web work to the research-agent subagent."
 )
 
 _LOCAL_USER = "local"
@@ -144,15 +148,21 @@ def build_agent(
     store.put((_LOCAL_USER,), _PREFERENCES_KEY, create_file_data(_PREFERENCES_SEED))
     tools = [tool for plugin in load_enabled(settings.plugins) for tool in plugin.tools()]
     tools.extend(mcp_tools)
+    researcher = research_subagent(tools, settings)
     return create_deep_agent(
         model=model if model is not None else chat_model(settings),
         tools=tools,
         system_prompt=SYSTEM_PROMPT,
         memory=["/memory/AGENTS.md", "/memories/preferences.md"],
         skills=["/skills/"],
+        subagents=[researcher] if researcher is not None else None,
         backend=project_backend(project_root, store),
         store=store,
-        middleware=(RequestedModel(settings),),
+        middleware=(
+            RequestedModel(settings),
+            ResearchMode(can_search=researcher is not None),
+            *lead_limits(),
+        ),
         permissions=[_READ_ONLY],
         checkpointer=InMemorySaver(),
         name="patchai",

@@ -18,6 +18,7 @@ from typing import Any
 
 from patchai.channels.content import UserContent
 from patchai.model_choice import requested_effort, requested_model
+from patchai.research import requested_research
 
 from langchain_core.messages import AIMessage, AIMessageChunk, RemoveMessage, ToolMessage
 from langgraph.graph.message import REMOVE_ALL_MESSAGES
@@ -103,6 +104,7 @@ async def stream_events(
     prior: Sequence[PriorLine] | None = None,
     model: str | None = None,
     effort: str | None = None,
+    research: bool = False,
 ) -> AsyncIterator[Event]:
     """Yield text, reasoning and tool progress for one turn.
 
@@ -113,13 +115,16 @@ async def stream_events(
     onto the latest head.
     ``model`` is a chat model id from the page. When it is set, that model
     answers this turn. ``effort`` is that model's reasoning effort.
+    ``research`` turns on research mode for this turn only.
     """
     choice = requested_model.set(model)
     effort_choice = requested_effort.set(effort)
+    research_choice = requested_research.set(research)
     try:
         async for event in _stream_turn(agent, thread_id, content, prior):
             yield event
     finally:
+        requested_research.reset(research_choice)
         requested_effort.reset(effort_choice)
         requested_model.reset(choice)
 

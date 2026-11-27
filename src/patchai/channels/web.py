@@ -210,10 +210,13 @@ def _chat_handler(
                 prior = parse_prior(payload)
                 model = _model_choice(payload)
                 effort = _effort_choice(payload)
+                research = _research_choice(payload)
             except TurnError as exc:
                 _plain(self, 400, str(exc))
                 return
-            result = _call_handler(handler, thread_id.strip(), content, prior, model, effort)
+            result = _call_handler(
+                handler, thread_id.strip(), content, prior, model, effort, research
+            )
             if hasattr(result, "__aiter__"):
                 _stream(self, loop, result)
                 return
@@ -254,6 +257,16 @@ def _effort_choice(payload: dict[str, object]) -> str | None:
     return effort
 
 
+def _research_choice(payload: dict[str, object]) -> bool:
+    """Whether this turn asked for research mode."""
+    value = payload.get("research")
+    if value is None:
+        return False
+    if not isinstance(value, bool):
+        raise TurnError("Research must be on or off.")
+    return value
+
+
 def _call_handler(
     handler: ReplyHandler,
     thread_id: str,
@@ -261,8 +274,9 @@ def _call_handler(
     prior,
     model: str | None,
     effort: str | None,
+    research: bool = False,
 ):
-    """Pass ``model`` and ``effort`` only when the handler accepts them."""
+    """Pass ``model``, ``effort``, and ``research`` only when the handler accepts them."""
     call = cast(Callable[..., object], handler)
     parameters = inspect.signature(handler).parameters
     args: list[object] = [thread_id, "local", content, prior]
@@ -271,6 +285,8 @@ def _call_handler(
     kwargs: dict[str, object] = {}
     if "effort" in parameters:
         kwargs["effort"] = effort
+    if "research" in parameters:
+        kwargs["research"] = research
     return call(*args, **kwargs)
 
 
