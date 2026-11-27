@@ -23,6 +23,7 @@ import { Image } from "@/components/image";
 import { normalizeMath } from "@/lib/math";
 import { Reasoning } from "@/components/reasoning.aui";
 import { ToolFallback } from "@/components/tool-fallback.aui";
+import { WebSources } from "@/components/web-sources";
 import { TooltipIconButton } from "@/components/tooltip-icon-button";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -770,11 +771,14 @@ const AssistantMessage: FC = () => {
                 );
               case "indicator":
                 return <ThinkingLine />;
+              case "source":
+                return null;
               default:
                 return null;
             }
           }}
         </MessagePrimitive.GroupedParts>
+        <WebSources />
         {stalled && !awaitingFirstPart && !traceRunning ? <ThinkingLine /> : null}
         <MessageError />
       </div>
