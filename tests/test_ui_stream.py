@@ -88,6 +88,110 @@ async def test_reasoning_errors_and_subagents_are_marked() -> None:
 
 
 @pytest.mark.asyncio
+async def test_pages_that_were_read_are_listed_once_after_the_answer() -> None:
+    search = json.dumps({
+        "query": "nobel",
+        "results": [
+            {
+                "title": "Nobel Peace Prize 2026",
+                "url": "https://www.nobelprize.org/prizes/peace/2026/press-release/",
+                "snippet": "Navi Pillay",
+            },
+            {
+                "title": "Unread hit",
+                "url": "https://example.com/other",
+                "snippet": "not opened",
+            },
+        ],
+    })
+    opened = "https://www.nobelprize.org/prizes/peace/2026/press-release/"
+    page = json.dumps({"url": opened, "text": "Navi Pillay", "truncated": False})
+    again = json.dumps({"url": opened.rstrip("/"), "text": "again", "truncated": False})
+    second = json.dumps({
+        "url": "https://www.un.org/sg/en",
+        "text": "António Guterres",
+        "truncated": False,
+    })
+    parts = await _parts([
+        ToolStarted("s", "search_web", False),
+        ToolCalled("s", "search_web", {"query": "nobel"}, False),
+        ToolFinished("s", search, False),
+        ToolStarted("r", "read_web_page", False),
+        ToolFinished("r", page, False),
+        ToolStarted("r2", "read_web_page", False),
+        ToolFinished("r2", again, False),
+        ToolStarted("bad", "read_web_page", False),
+        ToolFinished("bad", "The page could not be read: HTTP 404", True),
+        ToolStarted("u", "read_web_page", False),
+        ToolFinished("u", second, False),
+        TextDelta("Navi Pillay."),
+    ])
+
+    assert parts[-4:] == [
+        {"type": "text-end", "id": "text-1"},
+        {
+            "type": "source-url",
+            "sourceId": opened,
+            "url": opened,
+            "title": "Nobel Peace Prize 2026",
+        },
+        {
+            "type": "source-url",
+            "sourceId": "https://www.un.org/sg/en",
+            "url": "https://www.un.org/sg/en",
+            "title": "un.org",
+        },
+        {"type": "finish"},
+    ]
+
+
+@pytest.mark.asyncio
+async def test_a_shortened_page_result_is_still_listed() -> None:
+    full = json.dumps({
+        "url": "https://www.gov.uk/government/people/andy-burnham",
+        "text": "x" * 5000,
+        "truncated": False,
+    })
+    clipped = f"{full[:4000]}…"
+    parts = await _parts([
+        ToolStarted("r", "read_web_page", False),
+        ToolFinished("r", clipped, False),
+        TextDelta("Andy Burnham."),
+    ])
+
+    assert parts[-2] == {
+        "type": "source-url",
+        "sourceId": "https://www.gov.uk/government/people/andy-burnham",
+        "url": "https://www.gov.uk/government/people/andy-burnham",
+        "title": "gov.uk",
+    }
+
+
+@pytest.mark.asyncio
+async def test_a_read_page_is_still_listed_when_the_reply_fails() -> None:
+    page = json.dumps({
+        "url": "https://nodejs.org/en/download",
+        "text": "v26.13.1",
+        "truncated": False,
+    })
+    parts = await _parts([
+        ToolStarted("r", "read_web_page", False),
+        ToolFinished("r", page, False),
+    ], fail=True)
+
+    assert parts[-3:] == [
+        {
+            "type": "source-url",
+            "sourceId": "https://nodejs.org/en/download",
+            "url": "https://nodejs.org/en/download",
+            "title": "nodejs.org",
+        },
+        {"type": "error", "errorText": "PatchAI could not finish this reply."},
+        {"type": "finish"},
+    ]
+
+
+@pytest.mark.asyncio
 async def test_a_failure_closes_the_block_and_reports_an_error() -> None:
     parts = await _parts([TextDelta("Half")], fail=True)
 
