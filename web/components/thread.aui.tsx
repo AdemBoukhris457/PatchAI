@@ -8,6 +8,9 @@ import {
 import { ChainOfThought, ReasoningTrace } from "@/components/chain-trace";
 import { ComposerModelMenu } from "@/components/composer-model";
 import { ComposerResearchToggle } from "@/components/composer-research";
+import { ResearchActivity } from "@/components/research-activity";
+import { AnswerLink } from "@/components/citation-link";
+import { inlineReferences } from "@/lib/citations";
 import {
   ComposerMenus,
   ComposerTriggerButtons,
@@ -586,6 +589,10 @@ const MessageError: FC = () => {
 };
 
 const answerPlugins = { code, math };
+
+const answerComponents = { a: AnswerLink };
+
+const prepareAnswer = (text: string) => normalizeMath(inlineReferences(text));
 
 const answerMotion = {
   animation: "blurIn" as const,
