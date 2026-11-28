@@ -4,15 +4,19 @@ ddgs asks ordinary search engines and reads the page at a URL. No key or
 account is needed. A search engine can refuse a query; the tool then says so.
 Research workers call these tools in parallel, so searches share a few
 slots, start at least a moment apart, and wait and retry when every engine
-rate-limits them.
+rate-limits them. A page or search another worker fetched in the last few
+minutes is answered from memory, and a fetch already under way is shared.
 """
 
 import ipaddress
 import json
+import re
 import socket
 import threading
 import time
+from collections import OrderedDict
 from collections.abc import Callable
+from typing import Generic, TypeVar
 from urllib.parse import urlsplit
 
 from ddgs import DDGS
@@ -21,14 +25,76 @@ from ddgs.exceptions import DDGSException, RatelimitException
 _PAGE_LIMIT = 8_000
 _RESULT_LIMIT = 8
 _TIMEOUT_SECONDS = 12
-_FALLBACK_BACKENDS = ("google", "yahoo", "bing")
+_BACKENDS = ("yahoo", "google", "auto")
 _SEARCH_GAP_SECONDS = 0.5
 _RETRY_WAITS = (3.0, 8.0)
-_SEARCH_SLOTS = threading.BoundedSemaphore(3)
-_READ_SLOTS = threading.BoundedSemaphore(6)
+_SEARCH_SLOTS = threading.BoundedSemaphore(5)
+_READ_SLOTS = threading.BoundedSemaphore(8)
+_SITE_FILTER = re.compile(r"(?<!\S)site:(\S+)", re.IGNORECASE)
+_RECENT_SECONDS = 600.0
+_RECENT_SIZE = 256
 _pace_lock = threading.Lock()
 _last_search = 0.0
 _sleep = time.sleep
+_clock = time.monotonic
+
+T = TypeVar("T")
+
+
+class _Recent(Generic[T]):
+    """Answers fetched in the last few minutes, shared by every worker.
+
+    A second caller for a key that is still being fetched waits for that
+    fetch instead of starting its own. A failed fetch is not kept.
+    """
+
+    def __init__(self, seconds: float, size: int) -> None:
+        self._seconds = seconds
+        self._size = size
+        self._lock = threading.Lock()
+        self._items: OrderedDict[object, tuple[float, T]] = OrderedDict()
+        self._fetching: dict[object, threading.Lock] = {}
+
+    def get(self, key: object, fetch: Callable[[], T], keep: Callable[[T], bool]) -> T:
+        with self._lock:
+            found = self._fresh(key)
+            if found is not None:
+                return found[1]
+            gate = self._fetching.setdefault(key, threading.Lock())
+        with gate:
+            with self._lock:
+                found = self._fresh(key)
+            if found is not None:
+                return found[1]
+            try:
+                value = fetch()
+            finally:
+                with self._lock:
+                    self._fetching.pop(key, None)
+            if keep(value):
+                with self._lock:
+                    self._items[key] = (_clock() + self._seconds, value)
+                    while len(self._items) > self._size:
+                        self._items.popitem(last=False)
+            return value
+
+    def clear(self) -> None:
+        with self._lock:
+            self._items.clear()
+            self._fetching.clear()
+
+    def _fresh(self, key: object) -> tuple[float, T] | None:
+        found = self._items.get(key)
+        if found is None:
+            return None
+        if found[0] <= _clock():
+            del self._items[key]
+            return None
+        return found
+
+
+_recent_searches: _Recent[list[dict[str, object]]] = _Recent(_RECENT_SECONDS, _RECENT_SIZE)
+_recent_pages: _Recent[str] = _Recent(_RECENT_SECONDS, _RECENT_SIZE)
 
 
 def search_web(query: str, max_results: int = 5) -> str:
@@ -41,11 +107,14 @@ def search_web(query: str, max_results: int = 5) -> str:
     of titles, addresses, and snippets. Read the page you will cite with
     read_web_page before you state a number or a date from it.
     """
-    text = query.strip()
+    text = _plain_query(query)
     if not text:
         return "A search needs a query."
+    count = _count(max_results)
     try:
-        rows = _search(text, _count(max_results))
+        rows = _recent_searches.get(
+            (text.casefold(), count), lambda: _search(text, count), keep=bool
+        )
     except DDGSException as exc:
         return f"Web search did not answer: {exc}"
     results = [
@@ -73,6 +142,12 @@ def read_web_page(url: str) -> str:
     rejected = _reject_private(address)
     if rejected:
         return rejected
+    return _recent_pages.get(
+        address.split("#", 1)[0], lambda: _read(address), keep=lambda reply: reply.startswith("{")
+    )
+
+
+def _read(address: str) -> str:
     try:
         with _READ_SLOTS:
             page = DDGS(timeout=_TIMEOUT_SECONDS).extract(address, fmt="text_plain")
@@ -121,12 +196,13 @@ def _search(query: str, count: int) -> list[dict[str, object]]:
 def _search_engines(query: str, count: int) -> list[dict[str, object]]:
     """Search, then try another engine when the first one returns nothing.
 
-    The default engine list can stop after a result set that does not match
-    the query. A named engine is the second try.
+    Yahoo answers or says it has nothing in about a second. Google goes
+    through a proxy that can take the whole timeout, and ``auto`` also asks
+    engines that can, so they come after it.
     """
     last_error = "No results found."
     limited = False
-    for backend in ("auto", *_FALLBACK_BACKENDS):
+    for backend in _BACKENDS:
         _pace()
         try:
             rows = DDGS(timeout=_TIMEOUT_SECONDS).text(
@@ -140,14 +216,26 @@ def _search_engines(query: str, count: int) -> list[dict[str, object]]:
             continue
         except DDGSException as exc:
             last_error = str(exc)
-            if "timed out" in last_error:
-                break
             continue
         if rows:
             return list(rows)
     if limited:
         raise RatelimitException(last_error)
     raise DDGSException(last_error)
+
+
+def _plain_query(query: str) -> str:
+    """The query with each ``site:`` filter turned into the site's name.
+
+    Yahoo returns nothing for a ``site:`` filter, so the search falls
+    through to the engines that can take the whole timeout.
+    """
+    def site_name(match: re.Match[str]) -> str:
+        target = match.group(1).strip("\"'")
+        host = urlsplit(target if "//" in target else f"//{target}").hostname or target
+        return host.removeprefix("www.")
+
+    return " ".join(_SITE_FILTER.sub(site_name, query).split())
 
 
 def _pace() -> None:
