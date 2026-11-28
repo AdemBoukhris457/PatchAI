@@ -18,7 +18,7 @@ from typing import Any
 
 from patchai.channels.content import UserContent
 from patchai.model_choice import requested_effort, requested_model
-from patchai.research import requested_research
+from patchai.research import RESEARCH_AGENT, ROUND_TOOL, WORKER_EVENT, requested_research
 
 from langchain_core.messages import AIMessage, AIMessageChunk, RemoveMessage, ToolMessage
 from langgraph.graph.message import REMOVE_ALL_MESSAGES
@@ -140,10 +140,11 @@ async def _stream_turn(
     earlier = await _earlier_calls(agent, config)
     open_calls: dict[tuple[tuple[str, ...], int], str] = {}
     announced: set[str] = set()
+    hidden: set[str] = set()
     async for chunk in agent.astream(
         {"messages": [{"role": "user", "content": content}]},
         config,
-        stream_mode=["messages", "updates"],
+        stream_mode=["messages", "updates", "custom"],
         subgraphs=True,
         version="v2",
     ):
@@ -153,16 +154,48 @@ async def _stream_turn(
             token, _metadata = chunk["data"]
             for event in _token_events(token, ns, subagent, open_calls):
                 if isinstance(event, ToolStarted):
+                    if event.name == ROUND_TOOL:
+                        hidden.add(event.call_id)
+                        continue
                     announced.add(event.call_id)
+                if _call_of(event) in hidden:
+                    continue
                 yield event
         elif chunk.get("type") == "updates":
             for event in _update_events(chunk.get("data"), subagent):
                 if event.call_id in earlier:
                     continue
+                if isinstance(event, ToolCalled) and event.name == ROUND_TOOL:
+                    hidden.add(event.call_id)
+                if event.call_id in hidden:
+                    continue
                 if isinstance(event, ToolCalled) and event.call_id not in announced:
                     announced.add(event.call_id)
                     yield ToolStarted(event.call_id, event.name, subagent)
                 yield event
+        elif chunk.get("type") == "custom":
+            for event in _worker_events(chunk.get("data")):
+                yield event
+
+
+def _call_of(event: Event) -> str | None:
+    """The tool call an event belongs to, or ``None`` for text and reasoning."""
+    return getattr(event, "call_id", None)
+
+
+def _worker_events(data: object) -> Iterable[Event]:
+    """A research worker shown as its own ``task`` step while its round runs."""
+    if not isinstance(data, dict) or data.get("type") != WORKER_EVENT:
+        return
+    call_id = data.get("id")
+    if not isinstance(call_id, str):
+        return
+    if "output" in data:
+        yield ToolFinished(call_id, _clip(str(data["output"])), bool(data.get("error")))
+        return
+    args = {"subagent_type": RESEARCH_AGENT, "description": str(data.get("description", ""))}
+    yield ToolStarted(call_id, "task", False)
+    yield ToolCalled(call_id, "task", args, False)
 
 
 async def _resume_config(

@@ -5,7 +5,7 @@ description: Research a question across many public web pages with parallel rese
 
 # deep-research
 
-You lead the research. The `research-agent` workers search and read the web. You plan, send them out, check what they bring back, and write the report.
+You lead the research. The research workers search and read the web. You plan, start them with `research_round`, check what they bring back, and write the report.
 
 ## Steps
 
@@ -13,14 +13,14 @@ You lead the research. The `research-agent` workers search and read the web. You
    - **Straightforward:** one fact or one narrow topic. Send 1 worker.
    - **Depth-first:** one topic seen from several angles, such as the evidence for and against a policy. Send 2 or 3 workers, one angle each.
    - **Breadth-first:** several separate items, such as three products or three countries. Send one worker per item, up to the workers per round the research brief allows.
-   - At deep and max depth, split finer: give an item's separate angles, such as its numbers and its causes, their own workers.
-2. Call `write_todos` with the plan. Name each worker's part in one short line.
-3. Send one `task` call per worker with `subagent_type` set to `research-agent`. Put every `task` call of the round in the same reply, so the workers run at the same time. Each `description` says:
+   - At deep and max depth, split finer and fill the first round: give an item's separate angles, such as its numbers, its timeline, and its causes, their own workers until every worker the brief allows has a part.
+2. In one reply, call `write_todos` with the plan and call `research_round` with one assignment per worker. The round starts every worker at once and returns all their findings together. Name each worker's part in one short plan line, and keep the plan to worker parts only; the report comes after them. Mark every part of the round `in_progress` together. Each assignment says:
    - the objective, in one sentence
    - the time range, using today's date
    - what is out of scope, and what another worker already covers
    - that the worker reads every page it reports
-4. Read the findings. Mark the plan items done. If a part is missing, two sources conflict, or a worker raised a lead worth following, send another round for those gaps only. Stop at the number of rounds the research brief gives, or earlier when nothing is missing.
+3. Read the findings. Then, in one reply, mark the plan items done with `write_todos` and call `research_round` for the next round. A later round covers what is still missing: parts with too few sources, figures that conflict, newer sources, and leads a worker raised. Run at least the rounds the research brief asks for, and stop at its maximum or earlier once the minimum is met and nothing is missing.
+4. Use the time between rounds only to read findings and plan. The workers do all the searching and reading.
 5. Write the report in the chat:
    - Open with a short paragraph that answers the question directly.
    - Then use `##` sections, one per part of the plan. Use a table when you compare items.

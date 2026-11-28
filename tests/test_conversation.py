@@ -172,6 +172,39 @@ async def test_a_later_turn_reports_only_its_own_tool_calls() -> None:
     assert call_ids == {"call_2"}
 
 
+@pytest.mark.asyncio
+async def test_a_research_round_streams_each_worker_as_a_task_step() -> None:
+    round_call = {
+        "name": "research_round",
+        "args": {"assignments": ["Python release", "Rust release"]},
+        "id": "call_round",
+    }
+    agent = build_agent(
+        Settings(channel="web", model="scripted", plugins=("web_search",), mcp_config="mcp.json"),
+        model=ScriptedModel(replies=[
+            AIMessage(content="", tool_calls=[round_call]),
+            AIMessage(content="Findings."),
+            AIMessage(content="Findings."),
+            AIMessage(content="Report."),
+        ]),
+    )
+
+    events = [
+        event
+        async for event in stream_events(agent, "thread", "compare", research="standard")
+    ]
+
+    assert all(getattr(event, "call_id", None) != "call_round" for event in events)
+    called = [event for event in events if isinstance(event, ToolCalled) and event.name == "task"]
+    assert [event.call_id for event in called] == ["call_round-1", "call_round-2"]
+    assert called[0].args == {"subagent_type": "research-agent", "description": "Python release"}
+    assert not called[0].subagent
+    finished = [event for event in events if isinstance(event, ToolFinished)]
+    assert {event.call_id for event in finished} == {"call_round-1", "call_round-2"}
+    assert all(event.output.strip() == "Findings." for event in finished)
+    assert "".join(e.text for e in events if isinstance(e, TextDelta)).strip() == "Report."
+
+
 def test_reasoning_blocks_become_reasoning_events() -> None:
     token = AIMessageChunk(
         content=[{"type": "reasoning", "reasoning": "think"}, {"type": "text", "text": "hi"}]
