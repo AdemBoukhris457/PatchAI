@@ -152,7 +152,7 @@ export function ComposerModelMenu() {
   )
 }
 
-function useDismiss(
+export function useDismiss(
   open: boolean,
   root: RefObject<HTMLDivElement | null>,
   setOpen: Dispatch<SetStateAction<boolean>>,

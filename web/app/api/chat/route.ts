@@ -72,7 +72,9 @@ export async function POST(request: Request) {
         ...(typeof body.config?.reasoningEffort === "string"
           ? { effort: body.config.reasoningEffort }
           : {}),
-        ...(body.config?.research === true ? { research: true } : {}),
+        ...(body.config?.research === true || typeof body.config?.research === "string"
+          ? { research: body.config.research }
+          : {}),
         ...turn.body,
       }),
       signal: request.signal,
