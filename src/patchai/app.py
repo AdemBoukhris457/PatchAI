@@ -47,7 +47,7 @@ async def main(config_path: Path | None = None) -> None:
         prior=None,
         model=None,
         effort=None,
-        research=False,
+        research=None,
     ):
         del user_id
         async for event in stream_events(

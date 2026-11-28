@@ -13,6 +13,7 @@ from patchai.harness import build_agent
 from patchai.model_choice import RequestedModel
 from patchai.plugins import web_search
 from patchai.research import (
+    DEPTHS,
     RESEARCH_AGENT,
     ResearchMode,
     TodayDate,
@@ -89,13 +90,42 @@ def test_the_lead_sends_at_most_six_workers_in_a_turn() -> None:
     assert _limits(lead_limits()) == {"task": 6}
 
 
+def test_the_limits_follow_the_depth_of_the_turn() -> None:
+    worker = research_subagent([web_search.search_web, web_search.read_web_page], _settings())
+    assert worker is not None
+    middleware = [*worker["middleware"], *lead_limits()]
+
+    token = requested_research.set("max")
+    try:
+        deepest = _limits(middleware)
+    finally:
+        requested_research.reset(token)
+
+    assert deepest == {"search_web": 15, "read_web_page": 20, "task": 20}
+    assert _limits(middleware) == {"search_web": 6, "read_web_page": 8, "task": 6}
+    assert DEPTHS["max"].tasks * DEPTHS["max"].searches == 300
+
+
+def test_a_deeper_turn_gets_more_workers_and_rounds() -> None:
+    mode = ResearchMode(can_search=True, clock=lambda: date(2026, 11, 27))
+    token = requested_research.set("max")
+    try:
+        prompt = _prompt_seen(mode, _Request(SystemMessage(content="Base prompt.")))
+    finally:
+        requested_research.reset(token)
+
+    assert "at max depth" in prompt
+    assert "at most 5 workers per round and at most 4 rounds" in prompt
+    assert "follow leads the workers raised" in prompt
+
+
 def test_research_mode_adds_the_brief_and_date_only_while_it_is_on() -> None:
     mode = ResearchMode(can_search=True, clock=lambda: date(2026, 11, 27))
     request = _Request(SystemMessage(content="Base prompt."))
 
     assert _prompt_seen(mode, request) == "Base prompt."
 
-    token = requested_research.set(True)
+    token = requested_research.set("standard")
     try:
         prompt = _prompt_seen(mode, request)
     finally:
@@ -104,12 +134,14 @@ def test_research_mode_adds_the_brief_and_date_only_while_it_is_on() -> None:
     assert prompt.startswith("Base prompt.\n\n")
     assert "/skills/deep-research/SKILL.md" in prompt
     assert RESEARCH_AGENT in prompt
+    assert "at most 3 workers per round and at most 2 rounds" in prompt
+    assert "follow leads" not in prompt
     assert "Today is 2026-11-27." in prompt
 
 
 def test_research_mode_says_so_when_search_is_off() -> None:
     mode = ResearchMode(can_search=False, clock=lambda: date(2026, 11, 27))
-    token = requested_research.set(True)
+    token = requested_research.set("standard")
     try:
         prompt = _prompt_seen(mode, _Request(SystemMessage(content="Base prompt.")))
     finally:
@@ -119,14 +151,21 @@ def test_research_mode_says_so_when_search_is_off() -> None:
     assert RESEARCH_AGENT not in prompt
 
 
-def test_the_worker_always_knows_the_date() -> None:
+def test_the_worker_always_knows_the_date_and_its_budget() -> None:
     today = TodayDate(clock=lambda: date(2026, 11, 27))
     blocks = SystemMessage(content=[{"type": "text", "text": "Worker prompt."}])
 
     prompt = _prompt_seen(today, _Request(blocks))
+    token = requested_research.set("deep")
+    try:
+        deep = _prompt_seen(today, _Request(blocks))
+    finally:
+        requested_research.reset(token)
 
     assert prompt.startswith("Worker prompt.")
     assert prompt.endswith("Today is 2026-11-27.")
+    assert "6 searches and 8 page reads" in prompt
+    assert "10 searches and 15 page reads. Aim for about 6 good pages." in deep
 
 
 def test_the_harness_adds_the_worker_only_with_web_search(monkeypatch) -> None:
@@ -172,7 +211,7 @@ def test_a_research_turn_reaches_the_model_with_the_brief() -> None:
     )
     config = {"configurable": {"thread_id": "research"}}
     agent.invoke({"messages": [{"role": "user", "content": "plain"}]}, config=config)
-    token = requested_research.set(True)
+    token = requested_research.set("standard")
     try:
         agent.invoke({"messages": [{"role": "user", "content": "research"}]}, config=config)
     finally:

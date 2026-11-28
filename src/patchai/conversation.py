@@ -104,7 +104,7 @@ async def stream_events(
     prior: Sequence[PriorLine] | None = None,
     model: str | None = None,
     effort: str | None = None,
-    research: bool = False,
+    research: str | None = None,
 ) -> AsyncIterator[Event]:
     """Yield text, reasoning and tool progress for one turn.
 
@@ -115,7 +115,8 @@ async def stream_events(
     onto the latest head.
     ``model`` is a chat model id from the page. When it is set, that model
     answers this turn. ``effort`` is that model's reasoning effort.
-    ``research`` turns on research mode for this turn only.
+    ``research`` is a research depth that turns on research mode for this
+    turn only.
     """
     choice = requested_model.set(model)
     effort_choice = requested_effort.set(effort)

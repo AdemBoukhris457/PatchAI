@@ -309,7 +309,7 @@ async def test_web_channel_passes_a_chosen_effort() -> None:
 
 @pytest.mark.asyncio
 async def test_web_channel_passes_research_mode() -> None:
-    seen: list[bool] = []
+    seen: list[str | None] = []
 
     async def handler(
         session_id: str,
@@ -318,7 +318,7 @@ async def test_web_channel_passes_research_mode() -> None:
         prior=None,
         model=None,
         effort=None,
-        research=False,
+        research=None,
     ) -> str:
         del session_id, user_id, text, prior, model, effort
         seen.append(research)
@@ -337,20 +337,23 @@ async def test_web_channel_passes_research_mode() -> None:
         on, _ = await asyncio.to_thread(
             _post, channel.port, {"thread_id": "web", "text": "hello", "research": True}
         )
+        deepest, _ = await asyncio.to_thread(
+            _post, channel.port, {"thread_id": "web", "text": "hello", "research": "max"}
+        )
         off, _ = await asyncio.to_thread(
             _post, channel.port, {"thread_id": "web", "text": "hello"}
         )
         refused, refused_body = await asyncio.to_thread(
-            _post, channel.port, {"thread_id": "web", "text": "hello", "research": "yes"}
+            _post, channel.port, {"thread_id": "web", "text": "hello", "research": "huge"}
         )
     finally:
         channel.close()
         await task
 
-    assert (on, off) == (200, 200)
-    assert seen == [True, False]
+    assert (on, deepest, off) == (200, 200, 200)
+    assert seen == ["standard", "max", None]
     assert refused == 400
-    assert refused_body == "Research must be on or off."
+    assert refused_body == "That research depth is not available."
 
 
 def _read_then_close(port: int, marker: bytes) -> None:

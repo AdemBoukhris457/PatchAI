@@ -24,6 +24,7 @@ from patchai.channels.content import TurnError, UserContent, parse_prior, parse_
 from patchai.channels.registry import register
 from patchai.conversation import Event
 from patchai.model_choice import CHAT_EFFORTS, CHAT_MODELS
+from patchai.research import DEPTHS
 
 ReplyHandler = Callable[
     [str, str, UserContent, list[tuple[str, str]] | None],
@@ -257,13 +258,18 @@ def _effort_choice(payload: dict[str, object]) -> str | None:
     return effort
 
 
-def _research_choice(payload: dict[str, object]) -> bool:
-    """Whether this turn asked for research mode."""
+def _research_choice(payload: dict[str, object]) -> str | None:
+    """The research depth this turn asked for, or ``None`` for no research.
+
+    ``true`` is the standard depth, so an older page keeps working.
+    """
     value = payload.get("research")
-    if value is None:
-        return False
-    if not isinstance(value, bool):
-        raise TurnError("Research must be on or off.")
+    if value is None or value is False:
+        return None
+    if value is True:
+        return "standard"
+    if not isinstance(value, str) or value not in DEPTHS:
+        raise TurnError("That research depth is not available.")
     return value
 
 
@@ -274,7 +280,7 @@ def _call_handler(
     prior,
     model: str | None,
     effort: str | None,
-    research: bool = False,
+    research: str | None = None,
 ):
     """Pass ``model``, ``effort``, and ``research`` only when the handler accepts them."""
     call = cast(Callable[..., object], handler)
