@@ -2,21 +2,33 @@
 
 ddgs asks ordinary search engines and reads the page at a URL. No key or
 account is needed. A search engine can refuse a query; the tool then says so.
+Research workers call these tools in parallel, so searches share a few
+slots, start at least a moment apart, and wait and retry when every engine
+rate-limits them.
 """
 
 import ipaddress
 import json
 import socket
+import threading
+import time
 from collections.abc import Callable
 from urllib.parse import urlsplit
 
 from ddgs import DDGS
-from ddgs.exceptions import DDGSException
+from ddgs.exceptions import DDGSException, RatelimitException
 
 _PAGE_LIMIT = 8_000
 _RESULT_LIMIT = 8
 _TIMEOUT_SECONDS = 12
 _FALLBACK_BACKENDS = ("google", "yahoo", "bing")
+_SEARCH_GAP_SECONDS = 0.5
+_RETRY_WAITS = (3.0, 8.0)
+_SEARCH_SLOTS = threading.BoundedSemaphore(3)
+_READ_SLOTS = threading.BoundedSemaphore(6)
+_pace_lock = threading.Lock()
+_last_search = 0.0
+_sleep = time.sleep
 
 
 def search_web(query: str, max_results: int = 5) -> str:
@@ -62,7 +74,8 @@ def read_web_page(url: str) -> str:
     if rejected:
         return rejected
     try:
-        page = DDGS(timeout=_TIMEOUT_SECONDS).extract(address, fmt="text_plain")
+        with _READ_SLOTS:
+            page = DDGS(timeout=_TIMEOUT_SECONDS).extract(address, fmt="text_plain")
     except DDGSException as exc:
         return f"The page could not be read: {exc}"
     content = page.get("content")
@@ -93,19 +106,38 @@ plugin = WebSearchPlugin()
 
 
 def _search(query: str, count: int) -> list[dict[str, object]]:
+    """Search in a shared slot, and wait and retry while every engine rate-limits."""
+    with _SEARCH_SLOTS:
+        for wait in (*_RETRY_WAITS, None):
+            try:
+                return _search_engines(query, count)
+            except RatelimitException:
+                if wait is None:
+                    raise
+                _sleep(wait)
+    raise DDGSException("No results found.")
+
+
+def _search_engines(query: str, count: int) -> list[dict[str, object]]:
     """Search, then try another engine when the first one returns nothing.
 
     The default engine list can stop after a result set that does not match
     the query. A named engine is the second try.
     """
     last_error = "No results found."
+    limited = False
     for backend in ("auto", *_FALLBACK_BACKENDS):
+        _pace()
         try:
             rows = DDGS(timeout=_TIMEOUT_SECONDS).text(
                 query,
                 max_results=count,
                 backend=backend,
             )
+        except RatelimitException as exc:
+            last_error = str(exc)
+            limited = True
+            continue
         except DDGSException as exc:
             last_error = str(exc)
             if "timed out" in last_error:
@@ -113,7 +145,19 @@ def _search(query: str, count: int) -> list[dict[str, object]]:
             continue
         if rows:
             return list(rows)
+    if limited:
+        raise RatelimitException(last_error)
     raise DDGSException(last_error)
+
+
+def _pace() -> None:
+    """Start engine requests at least ``_SEARCH_GAP_SECONDS`` apart across threads."""
+    global _last_search
+    with _pace_lock:
+        wait = _last_search + _SEARCH_GAP_SECONDS - time.monotonic()
+        if wait > 0:
+            _sleep(wait)
+        _last_search = time.monotonic()
 
 
 def _article(text: str) -> str:

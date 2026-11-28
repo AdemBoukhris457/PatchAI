@@ -8,6 +8,13 @@ from patchai.plugins import web_search
 from patchai.plugins.registry import load_enabled
 
 
+@pytest.fixture(autouse=True)
+def _no_waiting(monkeypatch: pytest.MonkeyPatch) -> list[float]:
+    waits: list[float] = []
+    monkeypatch.setattr(web_search, "_sleep", waits.append)
+    return waits
+
+
 class _Client:
     def __init__(self, timeout: int) -> None:
         self.timeout = timeout
@@ -92,6 +99,50 @@ def test_search_web_reports_a_refusal(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(web_search, "DDGS", _Refused)
 
     assert "did not answer" in web_search.search_web("Python release")
+
+
+def test_search_web_waits_and_retries_when_every_engine_rate_limits(
+    monkeypatch: pytest.MonkeyPatch, _no_waiting: list[float]
+) -> None:
+    rounds: list[str] = []
+
+    class _BusyThenFree:
+        def __init__(self, timeout: int) -> None:
+            self.timeout = timeout
+
+        def text(self, query: str, max_results: int, backend: str = "auto") -> list[dict[str, str]]:
+            rounds.append(backend)
+            if len(rounds) <= 4:
+                raise web_search.RatelimitException("202 Ratelimit")
+            return [{"title": "Python", "href": "https://www.python.org/", "body": "Python"}]
+
+    monkeypatch.setattr(web_search, "DDGS", _BusyThenFree)
+
+    reply = json.loads(web_search.search_web("Python release"))
+
+    assert reply["results"][0]["url"] == "https://www.python.org/"
+    assert rounds == ["auto", "google", "yahoo", "bing", "auto"]
+    assert web_search._RETRY_WAITS[0] in _no_waiting
+
+
+def test_search_web_says_so_when_the_engines_stay_rate_limited(
+    monkeypatch: pytest.MonkeyPatch, _no_waiting: list[float]
+) -> None:
+    class _Busy:
+        def __init__(self, timeout: int) -> None:
+            self.timeout = timeout
+
+        def text(self, query: str, max_results: int, backend: str = "auto") -> list[dict[str, str]]:
+            raise web_search.RatelimitException("202 Ratelimit")
+
+    monkeypatch.setattr(web_search, "DDGS", _Busy)
+
+    reply = web_search.search_web("Python release")
+
+    assert reply == "Web search did not answer: 202 Ratelimit"
+    assert [wait for wait in _no_waiting if wait in web_search._RETRY_WAITS] == list(
+        web_search._RETRY_WAITS
+    )
 
 
 def test_article_keeps_an_opening_that_already_says_something() -> None:
